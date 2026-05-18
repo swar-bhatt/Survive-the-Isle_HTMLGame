@@ -21,12 +21,12 @@
         
         #top-bar {
             top: 10px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,20,0,0.9); padding: 8px 20px;
-            border: 3px solid #0f0; display: flex; gap: 20px; font-size: 12px;
+            background: rgba(0,20,0,0.9); padding: 10px 25px;
+            border: 3px solid #0f0; display: flex; gap: 25px; font-size: 13px;
         }
         
-        .bar { width: 130px; height: 14px; background: #111; border: 2px solid #0f0; position: relative; }
-        .bar-fill { height: 100%; transition: width 0.3s; }
+        .bar { width: 140px; height: 16px; background: #111; border: 2px solid #0f0; position: relative; }
+        .bar-fill { height: 100%; transition: width 0.4s; }
         
         #inventory-bar {
             bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -35,18 +35,19 @@
         }
         
         .slot {
-            width: 52px; height: 52px; background: #111; border: 3px solid #0f0;
-            display: flex; align-items: center; justify-content: center; font-size: 26px;
+            width: 54px; height: 54px; background: #111; border: 3px solid #0f0;
+            display: flex; align-items: center; justify-content: center; font-size: 28px;
             cursor: pointer; position: relative;
         }
         .slot:hover { background: #222; border-color: #ff0; }
-        .slot.selected { border-color: #ff0; box-shadow: 0 0 12px #ff0; }
-        .slot-count { position: absolute; bottom: 2px; right: 4px; font-size: 11px; background: rgba(0,0,0,0.8); padding: 0 4px; }
+        .slot.selected { border-color: #ff0; box-shadow: 0 0 15px #ff0; }
+        .slot-count { position: absolute; bottom: 3px; right: 5px; font-size: 12px; background: rgba(0,0,0,0.85); padding: 0 5px; }
         
         .message {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,30,0,0.95); padding: 20px 40px; border: 4px solid #0f0;
-            font-size: 18px; text-align: center; opacity: 0; transition: 0.4s;
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,40,0,0.95); padding: 25px 45px; border: 4px solid #0f0;
+            font-size: 18px; text-align: center; opacity: 0; transition: opacity 0.5s;
+            max-width: 500px;
         }
     </style>
 </head>
@@ -56,14 +57,12 @@
         
         <div id="top-bar" class="ui-overlay">
             ❤️ <div class="bar"><div id="health-bar" class="bar-fill" style="width:100%;background:#f33"></div></div>
-            🍖 <div class="bar"><div id="hunger-bar" class="bar-fill" style="width:75%;background:#fa0"></div></div>
-            💧 <div class="bar"><div id="thirst-bar" class="bar-fill" style="width:65%;background:#0af"></div></div>
-            ⚡ <div class="bar"><div id="energy-bar" class="bar-fill" style="width:90%"></div></div>
+            🍖 <div class="bar"><div id="hunger-bar" class="bar-fill" style="width:100%;background:#fa0"></div></div>
+            💧 <div class="bar"><div id="thirst-bar" class="bar-fill" style="width:100%;background:#0af"></div></div>
             <span>Day <span id="day-count">1</span></span>
         </div>
         
         <div id="inventory-bar" class="ui-overlay"></div>
-        
         <div id="message" class="message"></div>
     </div>
 
@@ -77,16 +76,18 @@
         
         let player = {
             x: 0, y: 0, size: 24, speed: 3.8,
-            health: 100, hunger: 75, thirst: 65, energy: 90
+            health: 100, hunger: 100, thirst: 100
         };
         
-        let tiles = [], entities = [], particles = [], inventory = [];
+        let tiles = [], entities = [], inventory = [];
         let camera = {x:0, y:0};
-        let keys = {}, mouse = {x:0,y:0};
+        let keys = {}, mouse = {x:0, y:0};
         let hotbarIndex = 0;
-        let day = 1, gameTime = 0;
+        let day = 1;
+        let gameTime = 0;           // Used for day cycle
+        let lastFrame = Date.now();
         
-        // ==================== INVENTORY & EATING ====================
+        // ==================== INVENTORY & ITEMS ====================
         function addItem(id, name, emoji, count = 1) {
             let item = inventory.find(i => i.id === id);
             if (item) item.count += count;
@@ -96,83 +97,97 @@
         
         function useHotbarItem() {
             if (inventory.length === 0) return;
-            let item = inventory[hotbarIndex];
+            const item = inventory[hotbarIndex];
             if (!item || item.count <= 0) return;
             
-            if (['berry', 'meat', 'cooked_meat'].includes(item.id)) {
-                // Eat
-                if (item.id === 'berry') {
-                    player.hunger = Math.min(100, player.hunger + 18);
-                    player.thirst = Math.min(100, player.thirst + 8);
-                } else {
-                    player.hunger = Math.min(100, player.hunger + 35);
-                }
+            if (item.id === 'berry') {
+                player.hunger = Math.min(100, player.hunger + 25);
+                player.thirst = Math.min(100, player.thirst + 15);
+                showMessage("🫐 Ate Berries (+Hunger & Thirst)", 1100);
+            } 
+            else if (item.id === 'sapling') {
+                plantSapling();
+                return;
+            }
+            
+            item.count--;
+            if (item.count <= 0) inventory.splice(hotbarIndex, 1);
+            renderHotbar();
+        }
+        
+        function plantSapling() {
+            const item = inventory[hotbarIndex];
+            if (item.id !== 'sapling' || item.count <= 0) return;
+            
+            const px = player.x + (Math.random() * 60 - 30);
+            const py = player.y + (Math.random() * 60 - 30);
+            
+            if (getTile(px, py).type === 'grass') {
+                entities.push({
+                    type: 'sapling',
+                    x: px, y: py,
+                    health: 100,
+                    growth: 0,           // 0 to 100
+                    emoji: '🌱'
+                });
                 item.count--;
                 if (item.count <= 0) inventory.splice(hotbarIndex, 1);
-                
-                showMessage("🍖 Ate " + item.name + "!", 1200);
+                showMessage("🌱 Sapling Planted", 1000);
                 renderHotbar();
             } else {
-                showMessage("Can't use " + item.name + " right now", 1000);
+                showMessage("❌ Must plant on grass!", 1000);
             }
         }
         
         function renderHotbar() {
             const container = document.getElementById('inventory-bar');
             container.innerHTML = '';
-            
             for (let i = 0; i < 8; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'slot';
                 if (i === hotbarIndex) slot.classList.add('selected');
                 
                 if (i < inventory.length) {
-                    const item = inventory[i];
-                    slot.innerHTML = `${item.emoji}<span class="slot-count">${item.count}</span>`;
+                    const it = inventory[i];
+                    slot.innerHTML = `${it.emoji}<span class="slot-count">${it.count}</span>`;
                 }
-                
-                slot.onclick = () => {
-                    hotbarIndex = i;
-                    renderHotbar();
-                };
+                slot.onclick = () => { hotbarIndex = i; renderHotbar(); };
                 container.appendChild(slot);
             }
         }
         
-        // ==================== GAME SETUP ====================
+        // ==================== WORLD GENERATION ====================
         function generateWorld() {
             tiles = [];
             for (let y = 0; y < WORLD_HEIGHT; y++) {
                 tiles[y] = [];
                 for (let x = 0; x < WORLD_WIDTH; x++) {
-                    const value = Math.sin(x*0.1) + Math.cos(y*0.1) + Math.random()*0.6;
-                    let type = value < 0.3 ? 'water' : value < 0.8 ? 'sand' : 'grass';
+                    const n = Math.sin(x*0.09) + Math.cos(y*0.09) + Math.random()*0.8;
+                    const type = n < 0.5 ? 'water' : n < 1.1 ? 'sand' : 'grass';
                     tiles[y][x] = {type};
                 }
             }
             
-            player.x = WORLD_WIDTH * TILE_SIZE / 2;
-            player.y = WORLD_HEIGHT * TILE_SIZE / 2;
+            player.x = WORLD_WIDTH * TILE_SIZE / 2 + 80;
+            player.y = WORLD_HEIGHT * TILE_SIZE / 2 - 50;
             
-            // Starting resources
             entities = [];
-            for (let i = 0; i < 160; i++) {
-                let x = Math.random() * WORLD_WIDTH * TILE_SIZE;
-                let y = Math.random() * WORLD_HEIGHT * TILE_SIZE;
+            for (let i = 0; i < 200; i++) {
+                const x = Math.random() * WORLD_WIDTH * TILE_SIZE;
+                const y = Math.random() * WORLD_HEIGHT * TILE_SIZE;
                 if (getTile(x, y).type === 'grass') {
                     entities.push({
-                        type: Math.random() > 0.5 ? 'tree' : 'bush',
-                        x: x, y: y, health: 80,
-                        emoji: Math.random() > 0.5 ? '🌳' : '🌿'
+                        type: 'tree',
+                        x: x, y: y, health: 100,
+                        emoji: '🌳'
                     });
                 }
             }
             
-            // Starting inventory
             inventory = [
-                {id: 'berry', name: 'Berries', emoji: '🫐', count: 12},
-                {id: 'wood', name: 'Wood', emoji: '🪵', count: 15},
-                {id: 'stone', name: 'Stone', emoji: '🪨', count: 8}
+                {id: 'berry', name: 'Berries', emoji: '🫐', count: 15},
+                {id: 'wood', name: 'Wood', emoji: '🪵', count: 12},
+                {id: 'sapling', name: 'Sapling', emoji: '🌱', count: 5}
             ];
             renderHotbar();
         }
@@ -180,7 +195,7 @@
         function getTile(x, y) {
             const tx = Math.floor(x / TILE_SIZE);
             const ty = Math.floor(y / TILE_SIZE);
-            if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) return {type:'water'};
+            if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) return {type: 'water'};
             return tiles[ty][tx];
         }
         
@@ -188,12 +203,38 @@
             return getTile(x, y).type !== 'water';
         }
         
+        // ==================== HARVESTING ====================
+        function harvest() {
+            const wx = camera.x + mouse.x;
+            const wy = camera.y + mouse.y;
+            
+            for (let i = 0; i < entities.length; i++) {
+                const e = entities[i];
+                const dx = e.x - wx;
+                const dy = e.y - wy;
+                
+                if (dx*dx + dy*dy < 1200) {
+                    e.health -= 45;
+                    
+                    if (e.health <= 0) {
+                        if (e.type === 'tree') {
+                            addItem('wood', 'Wood', '🪵', 6);
+                            addItem('sapling', 'Sapling', '🌱', Math.random() > 0.4 ? 2 : 1);
+                            showMessage("🌳 Tree chopped! Got Sapling(s)", 1300);
+                        } else if (e.type === 'bush') {
+                            addItem('berry', 'Berries', '🫐', 5);
+                        }
+                        entities.splice(i, 1);
+                    }
+                    return;
+                }
+            }
+        }
+        
         // ==================== INPUT ====================
         window.addEventListener('keydown', e => {
             keys[e.key.toLowerCase()] = true;
-            
             if (e.key === 'e' || e.key === 'E') useHotbarItem();
-            
             if (e.key >= '1' && e.key <= '8') {
                 hotbarIndex = parseInt(e.key) - 1;
                 renderHotbar();
@@ -208,36 +249,15 @@
             mouse.y = e.clientY - rect.top;
         });
         
-        canvas.addEventListener('click', () => harvest());
+        canvas.addEventListener('click', harvest);
         
-        function harvest() {
-            const wx = camera.x + mouse.x;
-            const wy = camera.y + mouse.y;
-            
-            for (let i = 0; i < entities.length; i++) {
-                const e = entities[i];
-                const dx = e.x - wx;
-                const dy = e.y - wy;
-                if (dx*dx + dy*dy < 900) {
-                    e.health -= 35;
-                    if (e.health <= 0) {
-                        if (e.type === 'tree') addItem('wood', 'Wood', '🪵', 6);
-                        else if (e.type === 'bush') addItem('berry', 'Berries', '🫐', 4);
-                        entities.splice(i, 1);
-                        showMessage("Collected!", 800);
-                    }
-                    break;
-                }
-            }
-        }
-        
-        // ==================== RENDERING & LOOP ====================
+        // ==================== GAME LOOP ====================
         function updateCamera() {
-            camera.x = player.x - canvas.width/2;
-            camera.y = player.y - canvas.height/2;
+            camera.x = player.x - canvas.width / 2;
+            camera.y = player.y - canvas.height / 2;
         }
         
-        function updatePlayer() {
+        function updatePlayer(delta) {
             let dx = 0, dy = 0;
             if (keys['w'] || keys['arrowup']) dy -= 1;
             if (keys['s'] || keys['arrowdown']) dy += 1;
@@ -247,19 +267,35 @@
             if (dx || dy) {
                 const len = Math.hypot(dx, dy);
                 dx /= len; dy /= len;
-                
-                let newX = player.x + dx * player.speed;
-                let newY = player.y + dy * player.speed;
+                const newX = player.x + dx * player.speed;
+                const newY = player.y + dy * player.speed;
                 
                 if (isWalkable(newX, player.y)) player.x = newX;
                 if (isWalkable(player.x, newY)) player.y = newY;
             }
             
-            // Drain
-            player.hunger -= 0.012;
-            player.thirst -= 0.018;
-            if (player.hunger <= 0) player.health -= 0.04;
-            if (player.thirst <= 0) player.health -= 0.06;
+            // === Balanced Drain Rates ===
+            player.hunger -= 0.0008 * delta;   // ~2 days
+            player.thirst -= 0.0032 * delta;   // ~0.5 day (12 hours)
+            
+            if (player.hunger <= 0) player.health -= 0.015 * delta;
+            if (player.thirst <= 0) player.health -= 0.025 * delta;
+            
+            player.hunger = Math.max(0, player.hunger);
+            player.thirst = Math.max(0, player.thirst);
+        }
+        
+        function updateEntities() {
+            for (let e of entities) {
+                if (e.type === 'sapling') {
+                    e.growth += 0.012; // grows over time
+                    if (e.growth >= 100) {
+                        e.type = 'tree';
+                        e.emoji = '🌳';
+                        e.health = 100;
+                    }
+                }
+            }
         }
         
         function render() {
@@ -286,7 +322,7 @@
             
             // Entities
             for (let e of entities) {
-                ctx.font = '32px Arial';
+                ctx.font = e.type === 'sapling' ? '26px Arial' : '36px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(e.emoji, e.x - camera.x, e.y - camera.y);
             }
@@ -295,12 +331,12 @@
             const px = player.x - camera.x;
             const py = player.y - camera.y;
             ctx.fillStyle = '#0ff';
-            ctx.fillRect(px-12, py-20, 24, 32);
+            ctx.fillRect(px - 12, py - 22, 24, 36);
             ctx.fillStyle = '#fdb';
-            ctx.fillRect(px-8, py-28, 16, 14);
+            ctx.fillRect(px - 8, py - 30, 16, 15);
         }
         
-        function showMessage(text, ms = 1500) {
+        function showMessage(text, ms = 1400) {
             const msg = document.getElementById('message');
             msg.textContent = text;
             msg.style.opacity = 1;
@@ -308,16 +344,29 @@
         }
         
         function gameLoop() {
-            updatePlayer();
+            const now = Date.now();
+            const delta = now - lastFrame;
+            lastFrame = now;
+            
+            gameTime += delta;
+            if (gameTime > 120000) { // 2 minutes = 1 day (adjustable)
+                gameTime = 0;
+                day++;
+                document.getElementById('day-count').textContent = day;
+            }
+            
+            updatePlayer(delta);
+            updateEntities();
             updateCamera();
             render();
             
+            // Update UI bars
             document.getElementById('health-bar').style.width = player.health + '%';
-            document.getElementById('hunger-bar').style.width = Math.max(0, player.hunger) + '%';
-            document.getElementById('thirst-bar').style.width = Math.max(0, player.thirst) + '%';
+            document.getElementById('hunger-bar').style.width = player.hunger + '%';
+            document.getElementById('thirst-bar').style.width = player.thirst + '%';
             
             if (player.health <= 0) {
-                showMessage("💀 YOU DIED...", 999999);
+                showMessage("💀 YOU PERISHED ON THE ISLAND...", 999999);
                 return;
             }
             
@@ -326,7 +375,7 @@
         
         window.onload = () => {
             generateWorld();
-            showMessage("🌴 Island Survivor\nPress E to eat\nClick trees/bushes to gather", 3000);
+            showMessage("🌴 Welcome!\nClick trees/bushes to gather\nE = Eat or Plant Sapling", 4000);
             gameLoop();
         };
     </script>
