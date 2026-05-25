@@ -7,46 +7,44 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         
-        body {
-            margin: 0; padding: 0; background: #000; color: #0f0;
-            font-family: 'Press Start 2P', system-ui;
-            overflow: hidden;
-        }
+        body { margin:0; padding:0; background:#000; color:#0f0; font-family:'Press Start 2P', system-ui; overflow:hidden; }
+        canvas { image-rendering:pixelated; border:4px solid #0f0; box-shadow:0 0 30px #0f0; }
         
-        #game-container { position: relative; width: 100vw; height: 100vh; }
-        canvas { image-rendering: pixelated; border: 4px solid #0f0; box-shadow: 0 0 30px #0f0; }
-        
-        .ui-overlay { position: absolute; pointer-events: none; }
-        #top-bar, #inventory-bar { pointer-events: auto; }
+        .ui-overlay { position:absolute; pointer-events:none; }
+        #top-bar, #inventory-bar { pointer-events:auto; }
         
         #top-bar {
-            top: 10px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,20,0,0.9); padding: 10px 25px;
-            border: 3px solid #0f0; display: flex; gap: 25px; font-size: 13px;
+            top:10px; left:50%; transform:translateX(-50%);
+            background:rgba(0,20,0,0.9); padding:10px 25px;
+            border:3px solid #0f0; display:flex; gap:25px; font-size:13px;
         }
-        
-        .bar { width: 140px; height: 16px; background: #111; border: 2px solid #0f0; position: relative; }
-        .bar-fill { height: 100%; transition: width 0.4s; }
+        .bar { width:140px; height:16px; background:#111; border:2px solid #0f0; position:relative; }
+        .bar-fill { height:100%; transition:width 0.4s; }
         
         #inventory-bar {
-            bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,20,0,0.95); padding: 10px; border: 3px solid #0f0;
-            display: flex; gap: 10px;
+            bottom:20px; left:50%; transform:translateX(-50%);
+            background:rgba(0,20,0,0.95); padding:10px; border:3px solid #0f0; display:flex; gap:10px;
         }
-        
         .slot {
-            width: 54px; height: 54px; background: #111; border: 3px solid #0f0;
-            display: flex; align-items: center; justify-content: center; font-size: 28px;
-            cursor: pointer; position: relative;
+            width:54px; height:54px; background:#111; border:3px solid #0f0;
+            display:flex; align-items:center; justify-content:center; font-size:28px;
+            cursor:pointer; position:relative;
         }
-        .slot:hover { background: #222; border-color: #ff0; }
-        .slot.selected { border-color: #ff0; box-shadow: 0 0 15px #ff0; }
-        .slot-count { position: absolute; bottom: 3px; right: 5px; font-size: 12px; background: rgba(0,0,0,0.85); padding: 0 5px; }
+        .slot:hover { background:#222; border-color:#ff0; }
+        .slot.selected { border-color:#ff0; box-shadow:0 0 15px #ff0; }
+        .slot-count { position:absolute; bottom:3px; right:5px; font-size:12px; background:rgba(0,0,0,0.85); padding:0 5px; }
         
+        #crafting-menu {
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            background:rgba(0,35,0,0.98); border:5px solid #0f0; padding:20px; width:560px;
+            display:none; max-height:75vh; overflow-y:auto; color:#0f0; font-size:14px;
+        }
+        .recipe { padding:12px; margin:8px 0; border:2px solid #0a0; cursor:pointer; }
+        .recipe:hover { background:rgba(0,120,0,0.3); }
         .message {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,40,0,0.95); padding: 25px 45px; border: 4px solid #0f0;
-            font-size: 18px; text-align: center; opacity: 0; transition: opacity 0.5s;
+            position:absolute; top:40%; left:50%; transform:translate(-50%,-50%);
+            background:rgba(0,40,0,0.95); padding:25px 45px; border:4px solid #0f0;
+            font-size:18px; text-align:center; opacity:0; transition:opacity 0.5s;
         }
     </style>
 </head>
@@ -63,6 +61,12 @@
         
         <div id="inventory-bar" class="ui-overlay"></div>
         <div id="message" class="message"></div>
+        
+        <div id="crafting-menu">
+            <h2 style="text-align:center;margin:0 0 20px 0;">🛠️ CRAFTING</h2>
+            <div id="recipes-list"></div>
+            <button onclick="closeCrafting()" style="width:100%;padding:12px;margin-top:15px;">Close (C)</button>
+        </div>
     </div>
 
     <script>
@@ -73,7 +77,7 @@
         const WORLD_WIDTH = 120;
         const WORLD_HEIGHT = 120;
         
-        let player = { x: 0, y: 0, size: 24, speed: 3.8, health: 100, hunger: 100, thirst: 100 };
+        let player = { x: 0, y: 0, size: 24, speed: 3.8, health: 100, hunger: 100, thirst: 100, tool: 'fists' };
         let tiles = [], entities = [], inventory = [];
         let camera = {x:0, y:0};
         let keys = {}, mouse = {x:0, y:0};
@@ -82,93 +86,18 @@
         let gameTime = 0;
         let lastFrame = Date.now();
         
-        // ==================== INVENTORY ====================
-        function addItem(id, name, emoji, count = 1) {
+        const recipes = [
+            { name: "Stone Axe", result: {id:"axe", emoji:"🪓"}, cost: [{id:"wood",count:12},{id:"stone",count:8}] },
+            { name: "Wood Sword", result: {id:"sword", emoji:"⚔️"}, cost: [{id:"wood",count:15},{id:"fiber",count:6}] },
+            { name: "Hoe", result: {id:"hoe", emoji:"🪴"}, cost: [{id:"wood",count:10},{id:"stone",count:6}] },
+            { name: "Berry Seeds", result: {id:"berry_seed", emoji:"🌾"}, cost: [{id:"berry",count:8}] }
+        ];
+        
+        function addItem(id, name, emoji, count=1) {
             let item = inventory.find(i => i.id === id);
             if (item) item.count += count;
             else inventory.push({id, name, emoji, count});
             renderHotbar();
-        }
-        
-        function useHotbarItem() {
-            if (inventory.length === 0) return;
-            const item = inventory[hotbarIndex];
-            if (!item || item.count <= 0) return;
-            
-            if (item.id === 'berry') {
-                if (player.hunger >= 100 && player.thirst >= 100) {
-                    showMessage("You're already full!", 1000);
-                    return;
-                }
-                player.hunger = Math.min(100, player.hunger + 25);
-                player.thirst = Math.min(100, player.thirst + 15);
-                showMessage("🫐 Ate Berries", 1000);
-            } 
-            else if (item.id === 'sapling') {
-                plantSapling();
-                return;
-            }
-            
-            item.count--;
-            if (item.count <= 0) inventory.splice(hotbarIndex, 1);
-            renderHotbar();
-        }
-        
-        function plantSapling() {
-            const item = inventory[hotbarIndex];
-            if (item.id !== 'sapling' || item.count <= 0) return;
-            
-            const px = player.x + (Math.random() * 60 - 30);
-            const py = player.y + (Math.random() * 60 - 30);
-            if (getTile(px, py).type === 'grass') {
-                entities.push({ type: 'sapling', x: px, y: py, health: 100, growth: 0, emoji: '🌱' });
-                item.count--;
-                if (item.count <= 0) inventory.splice(hotbarIndex, 1);
-                showMessage("🌱 Sapling Planted", 1000);
-                renderHotbar();
-            } else {
-                showMessage("❌ Plant on grass only!", 1000);
-            }
-        }
-        
-        function drinkWater() {
-            if (player.thirst >= 100) return showMessage("💧 You're not thirsty!", 1000);
-            if (isNearWater()) {
-                player.thirst = Math.min(100, player.thirst + 48);
-                showMessage("💧 Drank Water", 1000);
-            } else {
-                showMessage("❌ Get closer to water!", 1200);
-            }
-        }
-        
-        function expandLand() {
-            const wood = inventory.find(i => i.id === 'wood');
-            if (!wood || wood.count < 20) {
-                showMessage("❌ Need 20 Wood to expand land!", 1200);
-                return;
-            }
-            
-            let expanded = false;
-            const radius = 3;
-            const px = Math.floor(player.x / TILE_SIZE);
-            const py = Math.floor(player.y / TILE_SIZE);
-            
-            for (let y = py - radius; y <= py + radius; y++) {
-                for (let x = px - radius; x <= px + radius; x++) {
-                    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) continue;
-                    if (tiles[y][x].type === 'water') {
-                        tiles[y][x].type = Math.random() > 0.5 ? 'sand' : 'grass';
-                        expanded = true;
-                    }
-                }
-            }
-            
-            if (expanded) {
-                wood.count -= 20;
-                if (wood.count <= 0) inventory.splice(inventory.indexOf(wood), 1);
-                showMessage("🌍 Land Expanded! (+New Area)", 1300);
-                renderHotbar();
-            }
         }
         
         function renderHotbar() {
@@ -182,56 +111,152 @@
                     const it = inventory[i];
                     slot.innerHTML = `${it.emoji}<span class="slot-count">${it.count}</span>`;
                 }
-                slot.onclick = () => { hotbarIndex = i; renderHotbar(); };
+                slot.onclick = () => { 
+                    hotbarIndex = i; 
+                    const item = inventory[i];
+                    if (item && ['axe','sword','hoe'].includes(item.id)) player.tool = item.id;
+                    renderHotbar();
+                };
                 container.appendChild(slot);
             }
         }
         
-        // ==================== WORLD GENERATION ====================
+        // Crafting
+        function openCrafting() {
+            document.getElementById('crafting-menu').style.display = 'block';
+            renderRecipes();
+        }
+        function closeCrafting() {
+            document.getElementById('crafting-menu').style.display = 'none';
+        }
+        function renderRecipes() {
+            const container = document.getElementById('recipes-list');
+            container.innerHTML = '';
+            recipes.forEach((r, i) => {
+                let can = true;
+                let html = `<div class="recipe" onclick="craftItem(${i})"><strong>${r.name} ${r.result.emoji}</strong><br>`;
+                r.cost.forEach(c => {
+                    let have = inventory.find(item => item.id === c.id)?.count || 0;
+                    if (have < c.count) can = false;
+                    html += `• ${c.count} ${c.id} (${have}/${c.count})<br>`;
+                });
+                html += '</div>';
+                container.innerHTML += html;
+            });
+        }
+        function craftItem(index) {
+            const recipe = recipes[index];
+            let canCraft = true;
+            recipe.cost.forEach(ing => {
+                if (!inventory.find(i => i.id === ing.id && i.count >= ing.count)) canCraft = false;
+            });
+            if (!canCraft) return showMessage("Not enough materials!", 1000);
+            
+            recipe.cost.forEach(ing => {
+                let item = inventory.find(i => i.id === ing.id);
+                item.count -= ing.count;
+                if (item.count <= 0) inventory.splice(inventory.indexOf(item), 1);
+            });
+            
+            addItem(recipe.result.id, recipe.name, recipe.result.emoji, 1);
+            showMessage(`Crafted ${recipe.name}!`, 1200);
+            renderRecipes();
+        }
+        
+        // Land Expansion
+        function expandLand() {
+            const wood = inventory.find(i => i.id === 'wood');
+            if (!wood || wood.count < 20) return showMessage("❌ Need 20 Wood!", 1200);
+            
+            let expanded = false;
+            const radius = 3;
+            const px = Math.floor(player.x / TILE_SIZE);
+            const py = Math.floor(player.y / TILE_SIZE);
+            
+            for (let y = py - radius; y <= py + radius; y++) {
+                for (let x = px - radius; x <= px + radius; x++) {
+                    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) continue;
+                    if (tiles[y][x].type === 'water') {
+                        tiles[y][x].type = Math.random() > 0.6 ? 'sand' : 'grass';
+                        expanded = true;
+                    }
+                }
+            }
+            if (expanded) {
+                wood.count -= 20;
+                if (wood.count <= 0) inventory.splice(inventory.indexOf(wood), 1);
+                showMessage("🌍 Land Expanded!", 1300);
+                renderHotbar();
+            }
+        }
+        
+        function useTool() {
+            if (player.tool === 'hoe') plowLand();
+        }
+        
+        function plowLand() {
+            const tx = Math.floor(player.x / TILE_SIZE);
+            const ty = Math.floor(player.y / TILE_SIZE);
+            let done = false;
+            for (let y = ty-1; y <= ty+1; y++) {
+                for (let x = tx-1; x <= tx+1; x++) {
+                    if (tiles[y] && tiles[y][x] && tiles[y][x].type === 'grass') {
+                        tiles[y][x].type = 'plowed';
+                        done = true;
+                    }
+                }
+            }
+            showMessage(done ? "🌾 Land Plowed!" : "No grass nearby", 900);
+        }
+        
+        function plantSeed() {
+            const seed = inventory.find(i => i.id === 'berry_seed');
+            if (!seed || seed.count <= 0) return showMessage("No Berry Seeds!", 1000);
+            
+            const tx = Math.floor(player.x / TILE_SIZE);
+            const ty = Math.floor(player.y / TILE_SIZE);
+            
+            if (tiles[ty] && tiles[ty][tx] && tiles[ty][tx].type === 'plowed') {
+                entities.push({ type: 'berryPlant', x: tx*TILE_SIZE + TILE_SIZE/2, y: ty*TILE_SIZE + TILE_SIZE/2, growth: 0, emoji: '🌱' });
+                seed.count--;
+                if (seed.count <= 0) inventory.splice(inventory.indexOf(seed), 1);
+                showMessage("🌱 Berry Seeds Planted!", 1100);
+                renderHotbar();
+            } else {
+                showMessage("❌ Can only plant on plowed land!", 1400);
+            }
+        }
+        
+        // Rest of the game (generateWorld, harvest, etc.)
         function generateWorld() {
             tiles = [];
             for (let y = 0; y < WORLD_HEIGHT; y++) {
                 tiles[y] = [];
                 for (let x = 0; x < WORLD_WIDTH; x++) {
                     const n = Math.sin(x*0.09) + Math.cos(y*0.09) + Math.random()*0.8;
-                    const type = n < 0.5 ? 'water' : n < 1.1 ? 'sand' : 'grass';
-                    tiles[y][x] = {type};
+                    tiles[y][x] = {type: n < 0.5 ? 'water' : n < 1.1 ? 'sand' : 'grass'};
                 }
             }
             
-            // Safe spawn on grass
-            let spawnX = WORLD_WIDTH * TILE_SIZE / 2;
-            let spawnY = WORLD_HEIGHT * TILE_SIZE / 2;
-            
-            for (let i = 0; i < 100; i++) {
-                const tx = Math.floor(spawnX / TILE_SIZE) + (Math.random() * 20 - 10);
-                const ty = Math.floor(spawnY / TILE_SIZE) + (Math.random() * 20 - 10);
-                if (tiles[ty] && tiles[ty][tx] && tiles[ty][tx].type === 'grass') {
-                    spawnX = tx * TILE_SIZE + TILE_SIZE/2;
-                    spawnY = ty * TILE_SIZE + TILE_SIZE/2;
-                    break;
-                }
-            }
-            
-            player.x = spawnX;
-            player.y = spawnY;
+            player.x = WORLD_WIDTH * TILE_SIZE / 2 + 120;
+            player.y = WORLD_HEIGHT * TILE_SIZE / 2 - 60;
             
             entities = [];
             for (let i = 0; i < 230; i++) {
                 const x = Math.random() * WORLD_WIDTH * TILE_SIZE;
                 const y = Math.random() * WORLD_HEIGHT * TILE_SIZE;
                 if (getTile(x, y).type === 'grass') {
-                    const rand = Math.random();
-                    if (rand < 0.18) entities.push({ type: 'berryTree', x: x, y: y, health: 90, emoji: '🍒' });
-                    else if (rand < 0.65) entities.push({ type: 'tree', x: x, y: y, health: 100, emoji: '🌳' });
-                    else entities.push({ type: 'bush', x: x, y: y, health: 50, emoji: '🌿' });
+                    const r = Math.random();
+                    if (r < 0.18) entities.push({type:'berryTree',x,y,health:90,emoji:'🍒'});
+                    else if (r < 0.65) entities.push({type:'tree',x,y,health:100,emoji:'🌳'});
+                    else entities.push({type:'bush',x,y,health:50,emoji:'🌿'});
                 }
             }
             
             inventory = [
-                {id: 'berry', name: 'Berries', emoji: '🫐', count: 12},
-                {id: 'wood', name: 'Wood', emoji: '🪵', count: 25},
-                {id: 'sapling', name: 'Sapling', emoji: '🌱', count: 5}
+                {id:'berry', name:'Berries', emoji:'🫐', count:15},
+                {id:'wood', name:'Wood', emoji:'🪵', count:35},
+                {id:'sapling', name:'Sapling', emoji:'🌱', count:5}
             ];
             renderHotbar();
         }
@@ -239,21 +264,24 @@
         function getTile(x, y) {
             const tx = Math.floor(x / TILE_SIZE);
             const ty = Math.floor(y / TILE_SIZE);
-            if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) return {type: 'water'};
+            if (tx<0||tx>=WORLD_WIDTH||ty<0||ty>=WORLD_HEIGHT) return {type:'water'};
             return tiles[ty][tx];
         }
         
-        function isWalkable(x, y) {
-            return getTile(x, y).type !== 'water';
+        function isWalkable(x, y) { return getTile(x, y).type !== 'water'; }
+        function isNearWater() {
+            for (let dx = -50; dx <= 50; dx += 15)
+                for (let dy = -50; dy <= 50; dy += 15)
+                    if (getTile(player.x + dx, player.y + dy).type === 'water') return true;
+            return false;
         }
         
-        function isNearWater() {
-            for (let dx = -45; dx <= 45; dx += 15) {
-                for (let dy = -45; dy <= 45; dy += 15) {
-                    if (getTile(player.x + dx, player.y + dy).type === 'water') return true;
-                }
-            }
-            return false;
+        function drinkWater() {
+            if (player.thirst >= 100) return showMessage("💧 Not thirsty!", 800);
+            if (isNearWater()) {
+                player.thirst = Math.min(100, player.thirst + 48);
+                showMessage("💧 Drank Water", 900);
+            } else showMessage("❌ Get closer to water", 1000);
         }
         
         function harvest() {
@@ -261,36 +289,48 @@
             const wy = camera.y + mouse.y;
             for (let i = 0; i < entities.length; i++) {
                 const e = entities[i];
-                const dx = e.x - wx;
-                const dy = e.y - wy;
-                if (dx*dx + dy*dy < 1300) {
-                    e.health -= 48;
+                if (Math.hypot(e.x - wx, e.y - wy) < 1300) {
+                    let dmg = player.tool === 'axe' ? 85 : 48;
+                    e.health -= dmg;
                     if (e.health <= 0) {
-                        if (e.type === 'tree') {
-                            addItem('wood', 'Wood', '🪵', 6);
-                            addItem('sapling', 'Sapling', '🌱', 1);
-                        } else if (e.type === 'berryTree') {
-                            addItem('berry', 'Berries', '🫐', 8);
-                            addItem('sapling', 'Sapling', '🌱', 1);
-                        } else if (e.type === 'bush') {
-                            addItem('berry', 'Berries', '🫐', 5);
-                        }
-                        entities.splice(i, 1);
+                        if (e.type === 'tree') { addItem('wood','Wood','🪵',8); addItem('sapling','Sapling','🌱',1); }
+                        else if (e.type === 'berryTree') addItem('berry','Berries','🫐',10);
+                        else if (e.type === 'bush') addItem('berry','Berries','🫐',5);
+                        entities.splice(i,1);
                     }
                     return;
                 }
             }
         }
         
-        // ==================== INPUT ====================
+        function showMessage(text, ms=1400) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.style.opacity = 1;
+            setTimeout(() => msg.style.opacity = 0, ms);
+        }
+        
+        // Input
         window.addEventListener('keydown', e => {
             keys[e.key.toLowerCase()] = true;
-            if (e.key === 'e' || e.key === 'E') useHotbarItem();
+            if (e.key === 'c' || e.key === 'C') {
+                const menu = document.getElementById('crafting-menu');
+                if (menu.style.display === 'block') closeCrafting();
+                else openCrafting();
+            }
+            if (e.key === 'e' || e.key === 'E') {
+                const item = inventory[hotbarIndex];
+                if (item && item.id === 'berry_seed') plantSeed();
+                else useHotbarItem();
+            }
             if (e.key === 'f' || e.key === 'F') drinkWater();
+            if (e.key === 'q' || e.key === 'Q') useTool();
             if (e.key === 'v' || e.key === 'V') expandLand();
             
             if (e.key >= '1' && e.key <= '8') {
-                hotbarIndex = parseInt(e.key) - 1;
+                hotbarIndex = parseInt(e.key)-1;
+                const item = inventory[hotbarIndex];
+                if (item && ['axe','sword','hoe'].includes(item.id)) player.tool = item.id;
                 renderHotbar();
             }
         });
@@ -303,55 +343,51 @@
         });
         canvas.addEventListener('click', harvest);
         
-        // ==================== GAME LOOP ====================
         function updateCamera() {
-            camera.x = player.x - canvas.width / 2;
-            camera.y = player.y - canvas.height / 2;
+            camera.x = player.x - canvas.width/2;
+            camera.y = player.y - canvas.height/2;
         }
         
         function updatePlayer(delta) {
-            let dx = 0, dy = 0;
-            if (keys['w'] || keys['arrowup']) dy -= 1;
-            if (keys['s'] || keys['arrowdown']) dy += 1;
-            if (keys['a'] || keys['arrowleft']) dx -= 1;
-            if (keys['d'] || keys['arrowright']) dx += 1;
+            let dx=0, dy=0;
+            if (keys['w']||keys['arrowup']) dy-=1;
+            if (keys['s']||keys['arrowdown']) dy+=1;
+            if (keys['a']||keys['arrowleft']) dx-=1;
+            if (keys['d']||keys['arrowright']) dx+=1;
             
-            if (dx || dy) {
-                const len = Math.hypot(dx, dy);
-                dx /= len; dy /= len;
-                const newX = player.x + dx * player.speed;
-                const newY = player.y + dy * player.speed;
-                if (isWalkable(newX, player.y)) player.x = newX;
-                if (isWalkable(player.x, newY)) player.y = newY;
+            if (dx||dy) {
+                const len = Math.hypot(dx,dy);
+                dx/=len; dy/=len;
+                let nx = player.x + dx*player.speed;
+                let ny = player.y + dy*player.speed;
+                if (isWalkable(nx, player.y)) player.x = nx;
+                if (isWalkable(player.x, ny)) player.y = ny;
             }
             
             player.hunger -= 0.0008 * delta;
             player.thirst -= 0.0020 * delta;
-            
             if (player.hunger <= 0) player.health -= 0.015 * delta;
             if (player.thirst <= 0) player.health -= 0.025 * delta;
             
             player.hunger = Math.max(0, player.hunger);
             player.thirst = Math.max(0, player.thirst);
             
-            // Health Regeneration
             if (player.health < 100) {
-                let regenRate = 0;
-                if (player.hunger > 85 && player.thirst > 85) regenRate = 0.022;
-                else if (player.hunger > 65 && player.thirst > 65) regenRate = 0.009;
-                player.health += regenRate * delta;
+                let rate = 0;
+                if (player.hunger > 85 && player.thirst > 85) rate = 0.022;
+                else if (player.hunger > 65 && player.thirst > 65) rate = 0.009;
+                player.health += rate * delta;
                 if (player.health > 100) player.health = 100;
             }
         }
         
         function updateEntities() {
             for (let e of entities) {
-                if (e.type === 'sapling') {
-                    e.growth = (e.growth || 0) + 0.016;
+                if (e.type === 'sapling' || e.type === 'berryPlant') {
+                    e.growth = (e.growth || 0) + 0.018;
                     if (e.growth >= 100) {
-                        e.type = 'tree';
-                        e.emoji = '🌳';
-                        e.health = 100;
+                        e.type = e.type === 'berryPlant' ? 'berryTree' : 'tree';
+                        e.emoji = e.type === 'berryTree' ? '🍒' : '🌳';
                     }
                 }
             }
@@ -368,18 +404,17 @@
             
             for (let y = startY; y < endY; y++) {
                 for (let x = startX; x < endX; x++) {
-                    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) continue;
-                    const tile = tiles[y][x];
-                    const sx = x * TILE_SIZE - camera.x;
-                    const sy = y * TILE_SIZE - camera.y;
-                    ctx.fillStyle = tile.type === 'water' ? '#0a2a5a' : 
-                                   tile.type === 'sand' ? '#e2c080' : '#1a4a1a';
+                    if (x<0||x>=WORLD_WIDTH||y<0||y>=WORLD_HEIGHT) continue;
+                    const t = tiles[y][x];
+                    const sx = x*TILE_SIZE - camera.x;
+                    const sy = y*TILE_SIZE - camera.y;
+                    ctx.fillStyle = t.type==='water'?'#0a2a5a':t.type==='sand'?'#e2c080':t.type==='plowed'?'#8b5a2b':'#1a4a1a';
                     ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
                 }
             }
             
             for (let e of entities) {
-                ctx.font = e.type === 'sapling' ? '26px Arial' : '36px Arial';
+                ctx.font = (e.type==='sapling'||e.type==='berryPlant') ? '26px Arial' : '36px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(e.emoji, e.x - camera.x, e.y - camera.y);
             }
@@ -387,16 +422,9 @@
             const px = player.x - camera.x;
             const py = player.y - camera.y;
             ctx.fillStyle = '#0ff';
-            ctx.fillRect(px - 12, py - 22, 24, 36);
+            ctx.fillRect(px-12, py-22, 24, 36);
             ctx.fillStyle = '#fdb';
-            ctx.fillRect(px - 8, py - 30, 16, 15);
-        }
-        
-        function showMessage(text, ms = 1400) {
-            const msg = document.getElementById('message');
-            msg.textContent = text;
-            msg.style.opacity = 1;
-            setTimeout(() => msg.style.opacity = 0, ms);
+            ctx.fillRect(px-8, py-30, 16, 15);
         }
         
         function gameLoop() {
@@ -430,7 +458,7 @@
         
         window.onload = () => {
             generateWorld();
-            showMessage("🌍 Press V with 20 Wood to expand land!\nF = Drink | E = Eat/Plant | Click = Harvest", 5000);
+            showMessage("C = Crafting | V = Expand Land (20 Wood) | Q = Hoe | E = Eat/Plant", 5000);
             gameLoop();
         };
     </script>
