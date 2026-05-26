@@ -121,7 +121,46 @@
             }
         }
         
-        // Crafting
+        function useHotbarItem() {
+            const item = inventory[hotbarIndex];
+            if (!item || item.count <= 0) return;
+            
+            if (item.id === 'berry') {
+                if (player.hunger >= 100 && player.thirst >= 100) {
+                    showMessage("You're already full!", 1000);
+                    return;
+                }
+                player.hunger = Math.min(100, player.hunger + 25);
+                player.thirst = Math.min(100, player.thirst + 15);
+                showMessage("🫐 Ate Berries", 900);
+                item.count--;
+                if (item.count <= 0) inventory.splice(hotbarIndex, 1);
+                renderHotbar();
+            } 
+            else if (item.id === 'sapling') {
+                plantSapling();
+            }
+        }
+        
+        function plantSapling() {
+            const item = inventory[hotbarIndex];
+            if (item.id !== 'sapling' || item.count <= 0) return;
+            
+            const px = player.x + (Math.random() * 60 - 30);
+            const py = player.y + (Math.random() * 60 - 30);
+            
+            if (getTile(px, py).type === 'grass') {
+                entities.push({ type: 'sapling', x: px, y: py, health: 100, growth: 0, emoji: '🌱' });
+                item.count--;
+                if (item.count <= 0) inventory.splice(hotbarIndex, 1);
+                showMessage("🌱 Sapling Planted", 1000);
+                renderHotbar();
+            } else {
+                showMessage("❌ Can only plant on grass!", 1000);
+            }
+        }
+        
+        // Rest of the functions (crafting, expandLand, plow, plantSeed, etc.) remain the same as last version
         function openCrafting() {
             document.getElementById('crafting-menu').style.display = 'block';
             renderRecipes();
@@ -133,11 +172,9 @@
             const container = document.getElementById('recipes-list');
             container.innerHTML = '';
             recipes.forEach((r, i) => {
-                let can = true;
                 let html = `<div class="recipe" onclick="craftItem(${i})"><strong>${r.name} ${r.result.emoji}</strong><br>`;
                 r.cost.forEach(c => {
                     let have = inventory.find(item => item.id === c.id)?.count || 0;
-                    if (have < c.count) can = false;
                     html += `• ${c.count} ${c.id} (${have}/${c.count})<br>`;
                 });
                 html += '</div>';
@@ -163,16 +200,13 @@
             renderRecipes();
         }
         
-        // Land Expansion
         function expandLand() {
             const wood = inventory.find(i => i.id === 'wood');
             if (!wood || wood.count < 20) return showMessage("❌ Need 20 Wood!", 1200);
-            
             let expanded = false;
             const radius = 3;
             const px = Math.floor(player.x / TILE_SIZE);
             const py = Math.floor(player.y / TILE_SIZE);
-            
             for (let y = py - radius; y <= py + radius; y++) {
                 for (let x = px - radius; x <= px + radius; x++) {
                     if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) continue;
@@ -227,7 +261,6 @@
             }
         }
         
-        // Rest of the game (generateWorld, harvest, etc.)
         function generateWorld() {
             tiles = [];
             for (let y = 0; y < WORLD_HEIGHT; y++) {
@@ -242,13 +275,14 @@
             player.y = WORLD_HEIGHT * TILE_SIZE / 2 - 60;
             
             entities = [];
-            for (let i = 0; i < 230; i++) {
+            for (let i = 0; i < 280; i++) {
                 const x = Math.random() * WORLD_WIDTH * TILE_SIZE;
                 const y = Math.random() * WORLD_HEIGHT * TILE_SIZE;
                 if (getTile(x, y).type === 'grass') {
                     const r = Math.random();
-                    if (r < 0.18) entities.push({type:'berryTree',x,y,health:90,emoji:'🍒'});
-                    else if (r < 0.65) entities.push({type:'tree',x,y,health:100,emoji:'🌳'});
+                    if (r < 0.15) entities.push({type:'berryTree',x,y,health:90,emoji:'🍒'});
+                    else if (r < 0.45) entities.push({type:'tree',x,y,health:100,emoji:'🌳'});
+                    else if (r < 0.70) entities.push({type:'rock',x,y,health:80,emoji:'🪨'});
                     else entities.push({type:'bush',x,y,health:50,emoji:'🌿'});
                 }
             }
@@ -256,7 +290,7 @@
             inventory = [
                 {id:'berry', name:'Berries', emoji:'🫐', count:15},
                 {id:'wood', name:'Wood', emoji:'🪵', count:35},
-                {id:'sapling', name:'Sapling', emoji:'🌱', count:5}
+                {id:'sapling', name:'Sapling', emoji:'🌱', count:6}
             ];
             renderHotbar();
         }
@@ -295,6 +329,7 @@
                     if (e.health <= 0) {
                         if (e.type === 'tree') { addItem('wood','Wood','🪵',8); addItem('sapling','Sapling','🌱',1); }
                         else if (e.type === 'berryTree') addItem('berry','Berries','🫐',10);
+                        else if (e.type === 'rock') addItem('stone','Stone','🪨',6);
                         else if (e.type === 'bush') addItem('berry','Berries','🫐',5);
                         entities.splice(i,1);
                     }
@@ -310,7 +345,6 @@
             setTimeout(() => msg.style.opacity = 0, ms);
         }
         
-        // Input
         window.addEventListener('keydown', e => {
             keys[e.key.toLowerCase()] = true;
             if (e.key === 'c' || e.key === 'C') {
@@ -343,10 +377,7 @@
         });
         canvas.addEventListener('click', harvest);
         
-        function updateCamera() {
-            camera.x = player.x - canvas.width/2;
-            camera.y = player.y - canvas.height/2;
-        }
+        function updateCamera() { camera.x = player.x - canvas.width/2; camera.y = player.y - canvas.height/2; }
         
         function updatePlayer(delta) {
             let dx=0, dy=0;
@@ -356,8 +387,7 @@
             if (keys['d']||keys['arrowright']) dx+=1;
             
             if (dx||dy) {
-                const len = Math.hypot(dx,dy);
-                dx/=len; dy/=len;
+                const len = Math.hypot(dx,dy); dx/=len; dy/=len;
                 let nx = player.x + dx*player.speed;
                 let ny = player.y + dy*player.speed;
                 if (isWalkable(nx, player.y)) player.x = nx;
@@ -433,11 +463,7 @@
             lastFrame = now;
             
             gameTime += delta;
-            if (gameTime > 120000) {
-                gameTime = 0;
-                day++;
-                document.getElementById('day-count').textContent = day;
-            }
+            if (gameTime > 120000) { gameTime = 0; day++; document.getElementById('day-count').textContent = day; }
             
             updatePlayer(delta);
             updateEntities();
@@ -448,17 +474,14 @@
             document.getElementById('hunger-bar').style.width = player.hunger + '%';
             document.getElementById('thirst-bar').style.width = player.thirst + '%';
             
-            if (player.health <= 0) {
-                showMessage("💀 YOU PERISHED...", 999999);
-                return;
-            }
+            if (player.health <= 0) { showMessage("💀 YOU PERISHED...", 999999); return; }
             
             requestAnimationFrame(gameLoop);
         }
         
         window.onload = () => {
             generateWorld();
-            showMessage("C = Crafting | V = Expand Land (20 Wood) | Q = Hoe | E = Eat/Plant", 5000);
+            showMessage("E = Eat Berry / Plant Sapling\nC = Crafting | V = Expand Land | Q = Hoe", 5000);
             gameLoop();
         };
     </script>
