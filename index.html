@@ -1,489 +1,1170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Island Survivor</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        
-        body { margin:0; padding:0; background:#000; color:#0f0; font-family:'Press Start 2P', system-ui; overflow:hidden; }
-        canvas { image-rendering:pixelated; border:4px solid #0f0; box-shadow:0 0 30px #0f0; }
-        
-        .ui-overlay { position:absolute; pointer-events:none; }
-        #top-bar, #inventory-bar { pointer-events:auto; }
-        
-        #top-bar {
-            top:10px; left:50%; transform:translateX(-50%);
-            background:rgba(0,20,0,0.9); padding:10px 25px;
-            border:3px solid #0f0; display:flex; gap:25px; font-size:13px;
-        }
-        .bar { width:140px; height:16px; background:#111; border:2px solid #0f0; position:relative; }
-        .bar-fill { height:100%; transition:width 0.4s; }
-        
-        #inventory-bar {
-            bottom:20px; left:50%; transform:translateX(-50%);
-            background:rgba(0,20,0,0.95); padding:10px; border:3px solid #0f0; display:flex; gap:10px;
-        }
-        .slot {
-            width:54px; height:54px; background:#111; border:3px solid #0f0;
-            display:flex; align-items:center; justify-content:center; font-size:28px;
-            cursor:pointer; position:relative;
-        }
-        .slot:hover { background:#222; border-color:#ff0; }
-        .slot.selected { border-color:#ff0; box-shadow:0 0 15px #ff0; }
-        .slot-count { position:absolute; bottom:3px; right:5px; font-size:12px; background:rgba(0,0,0,0.85); padding:0 5px; }
-        
-        #crafting-menu {
-            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-            background:rgba(0,35,0,0.98); border:5px solid #0f0; padding:20px; width:560px;
-            display:none; max-height:75vh; overflow-y:auto; color:#0f0; font-size:14px;
-        }
-        .recipe { padding:12px; margin:8px 0; border:2px solid #0a0; cursor:pointer; }
-        .recipe:hover { background:rgba(0,120,0,0.3); }
-        .message {
-            position:absolute; top:40%; left:50%; transform:translate(-50%,-50%);
-            background:rgba(0,40,0,0.95); padding:25px 45px; border:4px solid #0f0;
-            font-size:18px; text-align:center; opacity:0; transition:opacity 0.5s;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Island Survivor 3D</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:'Orbitron',monospace;width:100%;height:100vh}
+#c{display:block;width:100%;height:100vh}
+
+/* TOP BAR */
+#topbar{
+  position:fixed;top:0;left:0;right:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.92) 0%,rgba(0,10,0,.7) 100%);
+  padding:10px 20px;border-bottom:1px solid rgba(0,255,80,.25);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  font-size:11px;color:#0f0;z-index:20;pointer-events:none;
+}
+.statblock{display:flex;align-items:center;gap:7px}
+.staticon{font-size:16px}
+.barlabel{font-size:9px;color:#6f9;letter-spacing:.5px;text-transform:uppercase}
+.bar{width:110px;height:11px;background:rgba(0,40,0,.6);border:1px solid rgba(0,255,80,.4);border-radius:20px;overflow:hidden}
+.bfill{height:100%;border-radius:20px;transition:width .35s}
+.dayscore{font-size:12px;color:#0f0;letter-spacing:1px;margin-left:6px}
+#score-display{margin-left:auto;font-size:11px;color:#ff0;letter-spacing:1px}
+#weathericon{font-size:18px;transition:all .5s}
+
+/* HOTBAR */
+#hotbar{
+  position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  display:flex;gap:6px;
+  background:rgba(0,0,0,.85);
+  padding:9px 12px;
+  border:1px solid rgba(0,255,80,.35);border-radius:10px;
+  z-index:20;pointer-events:auto;
+}
+.slot{
+  width:58px;height:58px;
+  background:rgba(0,20,0,.7);
+  border:1.5px solid rgba(0,180,60,.4);border-radius:7px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;position:relative;font-size:26px;
+  transition:all .15s;
+}
+.slot:hover{background:rgba(0,40,0,.9);border-color:#ff0}
+.slot.sel{border-color:#ff0;box-shadow:0 0 14px rgba(255,220,0,.5);background:rgba(30,25,0,.85)}
+.sc{position:absolute;bottom:3px;right:5px;font-size:10px;color:#0f0;background:rgba(0,0,0,.8);padding:0 3px;border-radius:2px;font-family:'Orbitron',monospace}
+.sname{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:7px;color:rgba(0,255,100,.5);font-family:'Orbitron',monospace;letter-spacing:.3px}
+
+/* MESSAGE */
+#msg{
+  position:fixed;top:28%;left:50%;transform:translateX(-50%);
+  background:rgba(0,30,0,.95);color:#0f0;
+  padding:13px 28px;border:1px solid rgba(0,255,80,.5);border-radius:7px;
+  font-size:14px;font-weight:700;letter-spacing:.5px;
+  opacity:0;transition:opacity .35s;pointer-events:none;z-index:30;text-align:center;
+}
+
+/* CROSSHAIR */
+#xhair{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;z-index:15;
+}
+#xhair::before,#xhair::after{
+  content:'';position:absolute;background:rgba(255,255,255,.7);border-radius:2px;
+}
+#xhair::before{width:16px;height:2px;top:-1px;left:-8px}
+#xhair::after{width:2px;height:16px;top:-8px;left:-1px}
+
+/* MINIMAP */
+#minimap{
+  position:fixed;bottom:100px;right:18px;
+  width:130px;height:130px;
+  background:rgba(0,0,0,.75);
+  border:1px solid rgba(0,255,80,.35);border-radius:8px;
+  overflow:hidden;z-index:20;
+}
+#minimap canvas{width:100%;height:100%}
+#minimap-label{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:8px;color:rgba(0,255,80,.5);letter-spacing:.5px}
+
+/* KEYBINDS */
+#keys{
+  position:fixed;top:70px;right:14px;
+  background:rgba(0,0,0,.65);color:rgba(0,255,100,.7);
+  font-size:9px;padding:10px 14px;border-radius:7px;line-height:2;
+  border:1px solid rgba(0,255,80,.2);z-index:20;letter-spacing:.3px;
+  transition:opacity .5s;
+}
+#keys.hidden{opacity:0}
+
+/* CRAFTING PANEL */
+#craft-panel{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(0,15,0,.97);border:1.5px solid rgba(0,255,80,.5);border-radius:10px;
+  padding:22px 28px;min-width:320px;z-index:40;display:none;
+  color:#0f0;font-size:11px;
+}
+#craft-panel h2{font-size:13px;color:#0f0;letter-spacing:1px;margin-bottom:14px;border-bottom:1px solid rgba(0,255,80,.3);padding-bottom:8px}
+.craft-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 10px;margin-bottom:7px;
+  background:rgba(0,30,0,.5);border:1px solid rgba(0,255,80,.2);border-radius:5px;
+  cursor:pointer;transition:background .15s;
+}
+.craft-item:hover{background:rgba(0,60,0,.7)}
+.craft-cost{font-size:9px;color:#8f8;letter-spacing:.3px}
+.craft-btn{background:rgba(0,100,0,.5);border:1px solid #0f0;color:#0f0;border-radius:4px;padding:4px 10px;font-family:'Orbitron',monospace;font-size:9px;cursor:pointer}
+.craft-btn:hover{background:rgba(0,180,0,.5)}
+#craft-close{float:right;cursor:pointer;font-size:18px;color:#f44;line-height:1}
+
+/* WEATHER OVERLAY */
+#rain-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;display:none}
+
+/* QUEST LOG */
+#questlog{
+  position:fixed;top:70px;left:14px;
+  background:rgba(0,0,0,.7);border:1px solid rgba(0,255,80,.25);border-radius:7px;
+  padding:10px 14px;min-width:200px;font-size:9px;color:#8f8;z-index:20;
+  max-height:200px;overflow:hidden;
+}
+#questlog h3{font-size:9px;color:#0f0;letter-spacing:.5px;margin-bottom:6px}
+.quest{display:flex;align-items:center;gap:6px;margin-bottom:4px;line-height:1.5}
+.quest.done{color:#4f4;text-decoration:line-through;opacity:.6}
+.qcheck{font-size:12px}
+
+/* DEATH SCREEN */
+#deathscreen{
+  position:fixed;inset:0;background:rgba(80,0,0,.92);
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px;
+  z-index:100;font-family:'Press Start 2P',monospace;
+}
+#deathscreen h1{color:#f44;font-size:28px;text-shadow:0 0 30px #f00;animation:flicker 1.2s infinite}
+#deathscreen p{color:#faa;font-size:13px}
+#restart-btn{
+  margin-top:10px;padding:12px 30px;background:rgba(180,0,0,.5);
+  border:2px solid #f44;color:#fff;font-family:'Press Start 2P',monospace;font-size:12px;
+  cursor:pointer;border-radius:5px;transition:all .2s;
+}
+#restart-btn:hover{background:rgba(255,0,0,.7);transform:scale(1.04)}
+
+@keyframes flicker{0%,100%{opacity:1}50%{opacity:.7}}
+
+/* NOTIFICATION STACK */
+#notifs{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:35;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.notif{background:rgba(0,30,0,.9);border:1px solid rgba(0,255,80,.4);border-radius:5px;padding:7px 18px;font-size:10px;color:#0f0;letter-spacing:.4px;animation:slideIn .3s ease;text-align:center}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+/* SCREEN FLASH */
+#flash{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:0;transition:opacity .15s}
+</style>
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="game" width="960" height="640"></canvas>
-        
-        <div id="top-bar" class="ui-overlay">
-            ❤️ <div class="bar"><div id="health-bar" class="bar-fill" style="width:100%;background:#f33"></div></div>
-            🍖 <div class="bar"><div id="hunger-bar" class="bar-fill" style="width:100%;background:#fa0"></div></div>
-            💧 <div class="bar"><div id="thirst-bar" class="bar-fill" style="width:100%;background:#0af"></div></div>
-            <span>Day <span id="day-count">1</span></span>
-        </div>
-        
-        <div id="inventory-bar" class="ui-overlay"></div>
-        <div id="message" class="message"></div>
-        
-        <div id="crafting-menu">
-            <h2 style="text-align:center;margin:0 0 20px 0;">🛠️ CRAFTING</h2>
-            <div id="recipes-list"></div>
-            <button onclick="closeCrafting()" style="width:100%;padding:12px;margin-top:15px;">Close (C)</button>
-        </div>
-    </div>
+<canvas id="c"></canvas>
+<div id="xhair"></div>
 
-    <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        
-        const TILE_SIZE = 32;
-        const WORLD_WIDTH = 120;
-        const WORLD_HEIGHT = 120;
-        
-        let player = { x: 0, y: 0, size: 24, speed: 3.8, health: 100, hunger: 100, thirst: 100, tool: 'fists' };
-        let tiles = [], entities = [], inventory = [];
-        let camera = {x:0, y:0};
-        let keys = {}, mouse = {x:0, y:0};
-        let hotbarIndex = 0;
-        let day = 1;
-        let gameTime = 0;
-        let lastFrame = Date.now();
-        
-        const recipes = [
-            { name: "Stone Axe", result: {id:"axe", emoji:"🪓"}, cost: [{id:"wood",count:12},{id:"stone",count:8}] },
-            { name: "Wood Sword", result: {id:"sword", emoji:"⚔️"}, cost: [{id:"wood",count:15},{id:"fiber",count:6}] },
-            { name: "Hoe", result: {id:"hoe", emoji:"🪴"}, cost: [{id:"wood",count:10},{id:"stone",count:6}] },
-            { name: "Berry Seeds", result: {id:"berry_seed", emoji:"🌾"}, cost: [{id:"berry",count:8}] }
-        ];
-        
-        function addItem(id, name, emoji, count=1) {
-            let item = inventory.find(i => i.id === id);
-            if (item) item.count += count;
-            else inventory.push({id, name, emoji, count});
-            renderHotbar();
-        }
-        
-        function renderHotbar() {
-            const container = document.getElementById('inventory-bar');
-            container.innerHTML = '';
-            for (let i = 0; i < 8; i++) {
-                const slot = document.createElement('div');
-                slot.className = 'slot';
-                if (i === hotbarIndex) slot.classList.add('selected');
-                if (i < inventory.length) {
-                    const it = inventory[i];
-                    slot.innerHTML = `${it.emoji}<span class="slot-count">${it.count}</span>`;
-                }
-                slot.onclick = () => { 
-                    hotbarIndex = i; 
-                    const item = inventory[i];
-                    if (item && ['axe','sword','hoe'].includes(item.id)) player.tool = item.id;
-                    renderHotbar();
-                };
-                container.appendChild(slot);
-            }
-        }
-        
-        function useHotbarItem() {
-            const item = inventory[hotbarIndex];
-            if (!item || item.count <= 0) return;
-            
-            if (item.id === 'berry') {
-                if (player.hunger >= 100 && player.thirst >= 100) {
-                    showMessage("You're already full!", 1000);
-                    return;
-                }
-                player.hunger = Math.min(100, player.hunger + 25);
-                player.thirst = Math.min(100, player.thirst + 15);
-                showMessage("🫐 Ate Berries", 900);
-                item.count--;
-                if (item.count <= 0) inventory.splice(hotbarIndex, 1);
-                renderHotbar();
-            } 
-            else if (item.id === 'sapling') {
-                plantSapling();
-            }
-        }
-        
-        function plantSapling() {
-            const item = inventory[hotbarIndex];
-            if (item.id !== 'sapling' || item.count <= 0) return;
-            
-            const px = player.x + (Math.random() * 60 - 30);
-            const py = player.y + (Math.random() * 60 - 30);
-            
-            if (getTile(px, py).type === 'grass') {
-                entities.push({ type: 'sapling', x: px, y: py, health: 100, growth: 0, emoji: '🌱' });
-                item.count--;
-                if (item.count <= 0) inventory.splice(hotbarIndex, 1);
-                showMessage("🌱 Sapling Planted", 1000);
-                renderHotbar();
-            } else {
-                showMessage("❌ Can only plant on grass!", 1000);
-            }
-        }
-        
-        // Rest of the functions (crafting, expandLand, plow, plantSeed, etc.) remain the same as last version
-        function openCrafting() {
-            document.getElementById('crafting-menu').style.display = 'block';
-            renderRecipes();
-        }
-        function closeCrafting() {
-            document.getElementById('crafting-menu').style.display = 'none';
-        }
-        function renderRecipes() {
-            const container = document.getElementById('recipes-list');
-            container.innerHTML = '';
-            recipes.forEach((r, i) => {
-                let html = `<div class="recipe" onclick="craftItem(${i})"><strong>${r.name} ${r.result.emoji}</strong><br>`;
-                r.cost.forEach(c => {
-                    let have = inventory.find(item => item.id === c.id)?.count || 0;
-                    html += `• ${c.count} ${c.id} (${have}/${c.count})<br>`;
-                });
-                html += '</div>';
-                container.innerHTML += html;
-            });
-        }
-        function craftItem(index) {
-            const recipe = recipes[index];
-            let canCraft = true;
-            recipe.cost.forEach(ing => {
-                if (!inventory.find(i => i.id === ing.id && i.count >= ing.count)) canCraft = false;
-            });
-            if (!canCraft) return showMessage("Not enough materials!", 1000);
-            
-            recipe.cost.forEach(ing => {
-                let item = inventory.find(i => i.id === ing.id);
-                item.count -= ing.count;
-                if (item.count <= 0) inventory.splice(inventory.indexOf(item), 1);
-            });
-            
-            addItem(recipe.result.id, recipe.name, recipe.result.emoji, 1);
-            showMessage(`Crafted ${recipe.name}!`, 1200);
-            renderRecipes();
-        }
-        
-        function expandLand() {
-            const wood = inventory.find(i => i.id === 'wood');
-            if (!wood || wood.count < 20) return showMessage("❌ Need 20 Wood!", 1200);
-            let expanded = false;
-            const radius = 3;
-            const px = Math.floor(player.x / TILE_SIZE);
-            const py = Math.floor(player.y / TILE_SIZE);
-            for (let y = py - radius; y <= py + radius; y++) {
-                for (let x = px - radius; x <= px + radius; x++) {
-                    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) continue;
-                    if (tiles[y][x].type === 'water') {
-                        tiles[y][x].type = Math.random() > 0.6 ? 'sand' : 'grass';
-                        expanded = true;
-                    }
-                }
-            }
-            if (expanded) {
-                wood.count -= 20;
-                if (wood.count <= 0) inventory.splice(inventory.indexOf(wood), 1);
-                showMessage("🌍 Land Expanded!", 1300);
-                renderHotbar();
-            }
-        }
-        
-        function useTool() {
-            if (player.tool === 'hoe') plowLand();
-        }
-        
-        function plowLand() {
-            const tx = Math.floor(player.x / TILE_SIZE);
-            const ty = Math.floor(player.y / TILE_SIZE);
-            let done = false;
-            for (let y = ty-1; y <= ty+1; y++) {
-                for (let x = tx-1; x <= tx+1; x++) {
-                    if (tiles[y] && tiles[y][x] && tiles[y][x].type === 'grass') {
-                        tiles[y][x].type = 'plowed';
-                        done = true;
-                    }
-                }
-            }
-            showMessage(done ? "🌾 Land Plowed!" : "No grass nearby", 900);
-        }
-        
-        function plantSeed() {
-            const seed = inventory.find(i => i.id === 'berry_seed');
-            if (!seed || seed.count <= 0) return showMessage("No Berry Seeds!", 1000);
-            
-            const tx = Math.floor(player.x / TILE_SIZE);
-            const ty = Math.floor(player.y / TILE_SIZE);
-            
-            if (tiles[ty] && tiles[ty][tx] && tiles[ty][tx].type === 'plowed') {
-                entities.push({ type: 'berryPlant', x: tx*TILE_SIZE + TILE_SIZE/2, y: ty*TILE_SIZE + TILE_SIZE/2, growth: 0, emoji: '🌱' });
-                seed.count--;
-                if (seed.count <= 0) inventory.splice(inventory.indexOf(seed), 1);
-                showMessage("🌱 Berry Seeds Planted!", 1100);
-                renderHotbar();
-            } else {
-                showMessage("❌ Can only plant on plowed land!", 1400);
-            }
-        }
-        
-        function generateWorld() {
-            tiles = [];
-            for (let y = 0; y < WORLD_HEIGHT; y++) {
-                tiles[y] = [];
-                for (let x = 0; x < WORLD_WIDTH; x++) {
-                    const n = Math.sin(x*0.09) + Math.cos(y*0.09) + Math.random()*0.8;
-                    tiles[y][x] = {type: n < 0.5 ? 'water' : n < 1.1 ? 'sand' : 'grass'};
-                }
-            }
-            
-            player.x = WORLD_WIDTH * TILE_SIZE / 2 + 120;
-            player.y = WORLD_HEIGHT * TILE_SIZE / 2 - 60;
-            
-            entities = [];
-            for (let i = 0; i < 280; i++) {
-                const x = Math.random() * WORLD_WIDTH * TILE_SIZE;
-                const y = Math.random() * WORLD_HEIGHT * TILE_SIZE;
-                if (getTile(x, y).type === 'grass') {
-                    const r = Math.random();
-                    if (r < 0.15) entities.push({type:'berryTree',x,y,health:90,emoji:'🍒'});
-                    else if (r < 0.45) entities.push({type:'tree',x,y,health:100,emoji:'🌳'});
-                    else if (r < 0.70) entities.push({type:'rock',x,y,health:80,emoji:'🪨'});
-                    else entities.push({type:'bush',x,y,health:50,emoji:'🌿'});
-                }
-            }
-            
-            inventory = [
-                {id:'berry', name:'Berries', emoji:'🫐', count:15},
-                {id:'wood', name:'Wood', emoji:'🪵', count:35},
-                {id:'sapling', name:'Sapling', emoji:'🌱', count:6}
-            ];
-            renderHotbar();
-        }
-        
-        function getTile(x, y) {
-            const tx = Math.floor(x / TILE_SIZE);
-            const ty = Math.floor(y / TILE_SIZE);
-            if (tx<0||tx>=WORLD_WIDTH||ty<0||ty>=WORLD_HEIGHT) return {type:'water'};
-            return tiles[ty][tx];
-        }
-        
-        function isWalkable(x, y) { return getTile(x, y).type !== 'water'; }
-        function isNearWater() {
-            for (let dx = -50; dx <= 50; dx += 15)
-                for (let dy = -50; dy <= 50; dy += 15)
-                    if (getTile(player.x + dx, player.y + dy).type === 'water') return true;
-            return false;
-        }
-        
-        function drinkWater() {
-            if (player.thirst >= 100) return showMessage("💧 Not thirsty!", 800);
-            if (isNearWater()) {
-                player.thirst = Math.min(100, player.thirst + 48);
-                showMessage("💧 Drank Water", 900);
-            } else showMessage("❌ Get closer to water", 1000);
-        }
-        
-        function harvest() {
-            const wx = camera.x + mouse.x;
-            const wy = camera.y + mouse.y;
-            for (let i = 0; i < entities.length; i++) {
-                const e = entities[i];
-                if (Math.hypot(e.x - wx, e.y - wy) < 1300) {
-                    let dmg = player.tool === 'axe' ? 85 : 48;
-                    e.health -= dmg;
-                    if (e.health <= 0) {
-                        if (e.type === 'tree') { addItem('wood','Wood','🪵',8); addItem('sapling','Sapling','🌱',1); }
-                        else if (e.type === 'berryTree') addItem('berry','Berries','🫐',10);
-                        else if (e.type === 'rock') addItem('stone','Stone','🪨',6);
-                        else if (e.type === 'bush') addItem('berry','Berries','🫐',5);
-                        entities.splice(i,1);
-                    }
-                    return;
-                }
-            }
-        }
-        
-        function showMessage(text, ms=1400) {
-            const msg = document.getElementById('message');
-            msg.textContent = text;
-            msg.style.opacity = 1;
-            setTimeout(() => msg.style.opacity = 0, ms);
-        }
-        
-        window.addEventListener('keydown', e => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key === 'c' || e.key === 'C') {
-                const menu = document.getElementById('crafting-menu');
-                if (menu.style.display === 'block') closeCrafting();
-                else openCrafting();
-            }
-            if (e.key === 'e' || e.key === 'E') {
-                const item = inventory[hotbarIndex];
-                if (item && item.id === 'berry_seed') plantSeed();
-                else useHotbarItem();
-            }
-            if (e.key === 'f' || e.key === 'F') drinkWater();
-            if (e.key === 'q' || e.key === 'Q') useTool();
-            if (e.key === 'v' || e.key === 'V') expandLand();
-            
-            if (e.key >= '1' && e.key <= '8') {
-                hotbarIndex = parseInt(e.key)-1;
-                const item = inventory[hotbarIndex];
-                if (item && ['axe','sword','hoe'].includes(item.id)) player.tool = item.id;
-                renderHotbar();
-            }
-        });
-        
-        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-        canvas.addEventListener('mousemove', e => {
-            const rect = canvas.getBoundingClientRect();
-            mouse.x = e.clientX - rect.left;
-            mouse.y = e.clientY - rect.top;
-        });
-        canvas.addEventListener('click', harvest);
-        
-        function updateCamera() { camera.x = player.x - canvas.width/2; camera.y = player.y - canvas.height/2; }
-        
-        function updatePlayer(delta) {
-            let dx=0, dy=0;
-            if (keys['w']||keys['arrowup']) dy-=1;
-            if (keys['s']||keys['arrowdown']) dy+=1;
-            if (keys['a']||keys['arrowleft']) dx-=1;
-            if (keys['d']||keys['arrowright']) dx+=1;
-            
-            if (dx||dy) {
-                const len = Math.hypot(dx,dy); dx/=len; dy/=len;
-                let nx = player.x + dx*player.speed;
-                let ny = player.y + dy*player.speed;
-                if (isWalkable(nx, player.y)) player.x = nx;
-                if (isWalkable(player.x, ny)) player.y = ny;
-            }
-            
-            player.hunger -= 0.0008 * delta;
-            player.thirst -= 0.0020 * delta;
-            if (player.hunger <= 0) player.health -= 0.015 * delta;
-            if (player.thirst <= 0) player.health -= 0.025 * delta;
-            
-            player.hunger = Math.max(0, player.hunger);
-            player.thirst = Math.max(0, player.thirst);
-            
-            if (player.health < 100) {
-                let rate = 0;
-                if (player.hunger > 85 && player.thirst > 85) rate = 0.022;
-                else if (player.hunger > 65 && player.thirst > 65) rate = 0.009;
-                player.health += rate * delta;
-                if (player.health > 100) player.health = 100;
-            }
-        }
-        
-        function updateEntities() {
-            for (let e of entities) {
-                if (e.type === 'sapling' || e.type === 'berryPlant') {
-                    e.growth = (e.growth || 0) + 0.018;
-                    if (e.growth >= 100) {
-                        e.type = e.type === 'berryPlant' ? 'berryTree' : 'tree';
-                        e.emoji = e.type === 'berryTree' ? '🍒' : '🌳';
-                    }
-                }
-            }
-        }
-        
-        function render() {
-            ctx.fillStyle = '#0a2a4a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const startX = Math.floor(camera.x / TILE_SIZE) - 1;
-            const endX = Math.ceil((camera.x + canvas.width) / TILE_SIZE) + 1;
-            const startY = Math.floor(camera.y / TILE_SIZE) - 1;
-            const endY = Math.ceil((camera.y + canvas.height) / TILE_SIZE) + 1;
-            
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    if (x<0||x>=WORLD_WIDTH||y<0||y>=WORLD_HEIGHT) continue;
-                    const t = tiles[y][x];
-                    const sx = x*TILE_SIZE - camera.x;
-                    const sy = y*TILE_SIZE - camera.y;
-                    ctx.fillStyle = t.type==='water'?'#0a2a5a':t.type==='sand'?'#e2c080':t.type==='plowed'?'#8b5a2b':'#1a4a1a';
-                    ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-                }
-            }
-            
-            for (let e of entities) {
-                ctx.font = (e.type==='sapling'||e.type==='berryPlant') ? '26px Arial' : '36px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(e.emoji, e.x - camera.x, e.y - camera.y);
-            }
-            
-            const px = player.x - camera.x;
-            const py = player.y - camera.y;
-            ctx.fillStyle = '#0ff';
-            ctx.fillRect(px-12, py-22, 24, 36);
-            ctx.fillStyle = '#fdb';
-            ctx.fillRect(px-8, py-30, 16, 15);
-        }
-        
-        function gameLoop() {
-            const now = Date.now();
-            const delta = now - lastFrame;
-            lastFrame = now;
-            
-            gameTime += delta;
-            if (gameTime > 120000) { gameTime = 0; day++; document.getElementById('day-count').textContent = day; }
-            
-            updatePlayer(delta);
-            updateEntities();
-            updateCamera();
-            render();
-            
-            document.getElementById('health-bar').style.width = player.health + '%';
-            document.getElementById('hunger-bar').style.width = player.hunger + '%';
-            document.getElementById('thirst-bar').style.width = player.thirst + '%';
-            
-            if (player.health <= 0) { showMessage("💀 YOU PERISHED...", 999999); return; }
-            
-            requestAnimationFrame(gameLoop);
-        }
-        
-        window.onload = () => {
-            generateWorld();
-            showMessage("E = Eat Berry / Plant Sapling\nC = Crafting | V = Expand Land | Q = Hoe", 5000);
-            gameLoop();
-        };
-    </script>
+<!-- Top HUD -->
+<div id="topbar">
+  <div class="statblock">
+    <span class="staticon">❤️</span>
+    <div>
+      <div class="barlabel">Health</div>
+      <div class="bar"><div id="hb" class="bfill" style="width:100%;background:linear-gradient(90deg,#c00,#f44)"></div></div>
+    </div>
+  </div>
+  <div class="statblock">
+    <span class="staticon">🍖</span>
+    <div>
+      <div class="barlabel">Hunger</div>
+      <div class="bar"><div id="fb" class="bfill" style="width:100%;background:linear-gradient(90deg,#a05010,#f80)"></div></div>
+    </div>
+  </div>
+  <div class="statblock">
+    <span class="staticon">💧</span>
+    <div>
+      <div class="barlabel">Thirst</div>
+      <div class="bar"><div id="wb" class="bfill" style="width:100%;background:linear-gradient(90deg,#0080c0,#0cf)"></div></div>
+    </div>
+  </div>
+  <div class="statblock">
+    <span class="staticon">⚡</span>
+    <div>
+      <div class="barlabel">Stamina</div>
+      <div class="bar"><div id="stb" class="bfill" style="width:100%;background:linear-gradient(90deg,#a0a000,#ff0)"></div></div>
+    </div>
+  </div>
+  <span class="dayscore">Day <span id="dc">1</span></span>
+  <span id="weathericon">☀️</span>
+  <span id="score-display">🏆 Score: <span id="sc">0</span></span>
+  <span style="font-size:9px;color:rgba(0,255,80,.5);letter-spacing:.5px" id="hintbar">Click to capture mouse</span>
+</div>
+
+<!-- Hotbar -->
+<div id="hotbar"></div>
+
+<!-- Minimap -->
+<div id="minimap">
+  <canvas id="mm" width="130" height="130"></canvas>
+  <div id="minimap-label">MAP</div>
+</div>
+
+<!-- Keys -->
+<div id="keys">
+  WASD — Move &nbsp;|&nbsp; SHIFT — Sprint<br>
+  E — Use Item &nbsp;|&nbsp; F — Drink<br>
+  V — Expand Land &nbsp;|&nbsp; C — Craft<br>
+  R — Drop Torch &nbsp;|&nbsp; T — Weather<br>
+  Click — Harvest &nbsp;|&nbsp; 1-8 / Scroll — Select<br>
+  H — Hide Controls
+</div>
+
+<!-- Quest Log -->
+<div id="questlog">
+  <h3>📋 QUESTS</h3>
+  <div class="quest" id="q1"><span class="qcheck">○</span>Collect 10 Wood</div>
+  <div class="quest" id="q2"><span class="qcheck">○</span>Eat 3 Berries</div>
+  <div class="quest" id="q3"><span class="qcheck">○</span>Survive 3 Days</div>
+  <div class="quest" id="q4"><span class="qcheck">○</span>Plant 3 Saplings</div>
+  <div class="quest" id="q5"><span class="qcheck">○</span>Expand Land Once</div>
+  <div class="quest" id="q6"><span class="qcheck">○</span>Craft a Campfire</div>
+</div>
+
+<!-- Notifications -->
+<div id="notifs"></div>
+
+<!-- Message -->
+<div id="msg"></div>
+
+<!-- Crafting Panel -->
+<div id="craft-panel">
+  <h2>🔨 CRAFTING <span id="craft-close" onclick="closeCraft()">✕</span></h2>
+  <div class="craft-item" onclick="craftCampfire()">
+    <div>
+      <div style="font-size:20px;display:inline">🔥</div>
+      <span style="margin-left:8px;font-size:12px">Campfire</span>
+      <div class="craft-cost">Cost: 5 Wood</div>
+    </div>
+    <button class="craft-btn">CRAFT</button>
+  </div>
+  <div class="craft-item" onclick="craftRaft()">
+    <div>
+      <div style="font-size:20px;display:inline">🛶</div>
+      <span style="margin-left:8px;font-size:12px">Raft Plank</span>
+      <div class="craft-cost">Cost: 8 Wood</div>
+    </div>
+    <button class="craft-btn">CRAFT</button>
+  </div>
+  <div class="craft-item" onclick="craftMedicine()">
+    <div>
+      <div style="font-size:20px;display:inline">💊</div>
+      <span style="margin-left:8px;font-size:12px">Medicine</span>
+      <div class="craft-cost">Cost: 4 Berries</div>
+    </div>
+    <button class="craft-btn">CRAFT</button>
+  </div>
+  <div class="craft-item" onclick="craftFishingRod()">
+    <div>
+      <div style="font-size:20px;display:inline">🎣</div>
+      <span style="margin-left:8px;font-size:12px">Fishing Rod</span>
+      <div class="craft-cost">Cost: 3 Wood</div>
+    </div>
+    <button class="craft-btn">CRAFT</button>
+  </div>
+</div>
+
+<!-- Death Screen -->
+<div id="deathscreen">
+  <h1>💀 YOU PERISHED</h1>
+  <p id="death-stats"></p>
+  <button id="restart-btn" onclick="restartGame()">↺ RESTART</button>
+</div>
+
+<!-- Screen Flash -->
+<div id="flash"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// =====================================================================
+// ISLAND SURVIVOR 3D — Full Enhanced Edition
+// =====================================================================
+const W=window;
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setSize(W.innerWidth,W.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(W.devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x87ceeb,55,180);
+
+const camera=new THREE.PerspectiveCamera(72,W.innerWidth/W.innerHeight,0.1,500);
+camera.position.set(0,5,10);
+
+// =====================================================================
+// LIGHTING
+// =====================================================================
+const sun=new THREE.DirectionalLight(0xfff5cc,1.5);
+sun.position.set(80,100,50);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near=1;sun.shadow.camera.far=300;
+sun.shadow.camera.left=-120;sun.shadow.camera.right=120;
+sun.shadow.camera.top=120;sun.shadow.camera.bottom=-120;
+scene.add(sun);
+const ambLight=new THREE.AmbientLight(0x334455,0.7);scene.add(ambLight);
+const hemi=new THREE.HemisphereLight(0x87ceeb,0x3a6b1a,0.6);scene.add(hemi);
+const moonLight=new THREE.DirectionalLight(0x335577,0);
+moonLight.position.set(-80,60,-50);scene.add(moonLight);
+
+// =====================================================================
+// WORLD
+// =====================================================================
+const WSIZE=120, TSIZE=2.5, HALF=WSIZE*TSIZE/2;
+const tiles=[];
+
+// Seeded pseudo-random for consistent world shape
+function seededRand(x,z){
+  const s=Math.sin(x*127.1+z*311.7)*43758.5453;
+  return s-Math.floor(s);
+}
+function noise2(x,z){
+  // Base island shape: distance from center forces land in middle
+  const cx=WSIZE/2,cz=WSIZE/2;
+  const dist=Math.hypot(x-cx,z-cz)/(WSIZE*0.38);
+  const islandBias=1.2-dist*dist*1.8; // positive at center, negative at edges
+  return Math.sin(x*0.16)*0.5+Math.cos(z*0.16)*0.5
+        +Math.sin(x*0.07+z*0.05)*0.35
+        +Math.sin(x*0.03-z*0.04)*0.2
+        +(seededRand(x,z)-0.5)*0.4
+        +islandBias;
+}
+
+// Ground geometry merged for perf — kept per-tile for type tracking
+const tileGeom=new THREE.PlaneGeometry(TSIZE,TSIZE);
+const matWater=new THREE.MeshLambertMaterial({color:0x1a6fad});
+const matSand=new THREE.MeshLambertMaterial({color:0xd4b86a});
+const matGrass=new THREE.MeshLambertMaterial({color:0x3a7a2a});
+
+for(let z=0;z<WSIZE;z++){
+  tiles[z]=[];
+  for(let x=0;x<WSIZE;x++){
+    const n=noise2(x,z);
+    const type=n<0.4?'water':n<0.72?'sand':'grass';
+    const mat=type==='water'?matWater:type==='sand'?matSand:matGrass;
+    const m=new THREE.Mesh(tileGeom,mat);
+    m.rotation.x=-Math.PI/2;
+    m.position.set(x*TSIZE-HALF+TSIZE/2,type==='water'?-0.15:0,z*TSIZE-HALF+TSIZE/2);
+    m.receiveShadow=true;
+    scene.add(m);
+    tiles[z][x]={type,mesh:m};
+  }
+}
+
+// Ocean
+const oceanMat=new THREE.MeshLambertMaterial({color:0x0d4f8a,transparent:true,opacity:0.85});
+const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),oceanMat);
+ocean.rotation.x=-Math.PI/2;ocean.position.y=-0.05;scene.add(ocean);
+
+// Water shimmer tiles
+const waterMat2=new THREE.MeshLambertMaterial({color:0x1a7acc,transparent:true,opacity:0.7});
+for(let z=0;z<WSIZE;z++)for(let x=0;x<WSIZE;x++){
+  if(tiles[z][x].type==='water'){
+    const wm=new THREE.Mesh(tileGeom,waterMat2);
+    wm.rotation.x=-Math.PI/2;
+    wm.position.set(x*TSIZE-HALF+TSIZE/2,0.05,z*TSIZE-HALF+TSIZE/2);
+    scene.add(wm);
+  }
+}
+
+function getTileAt(wx,wz){
+  const tx=Math.floor((wx+HALF)/TSIZE);
+  const tz=Math.floor((wz+HALF)/TSIZE);
+  if(tx<0||tx>=WSIZE||tz<0||tz>=WSIZE)return{type:'water'};
+  return tiles[tz][tx];
+}
+
+// =====================================================================
+// ENTITY FACTORY
+// =====================================================================
+function makeTrunk(h,r){
+  const g=new THREE.CylinderGeometry(r,r*1.4,h,8);
+  const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0x7a4a1a}));
+  m.castShadow=true;m.receiveShadow=true;return m;
+}
+function makeFoliage(r,y,col){
+  const shapes=[
+    new THREE.SphereGeometry(r,9,7),
+    new THREE.ConeGeometry(r,r*1.5,8),
+    new THREE.DodecahedronGeometry(r,0)
+  ];
+  const m=new THREE.Mesh(shapes[Math.floor(Math.random()*shapes.length)],new THREE.MeshLambertMaterial({color:col}));
+  m.position.y=y;m.castShadow=true;return m;
+}
+function makeTree(){
+  const g=new THREE.Group();
+  const t=makeTrunk(2.8,0.22);t.position.y=1.4;g.add(t);
+  g.add(makeFoliage(1.9,3.4,0x1e6e1e));
+  g.add(makeFoliage(1.3,4.8,0x2a8a2a));
+  g.userData={type:'tree',health:100};return g;
+}
+function makeBerryTree(){
+  const g=new THREE.Group();
+  const t=makeTrunk(2.2,0.18);t.position.y=1.1;g.add(t);
+  g.add(makeFoliage(1.5,2.8,0x2a8a1e));
+  for(let i=0;i<8;i++){
+    const b=new THREE.Mesh(new THREE.SphereGeometry(0.13,5,5),new THREE.MeshLambertMaterial({color:0xcc1830}));
+    const a=Math.random()*Math.PI*2,r=1.1+Math.random()*.5;
+    b.position.set(Math.cos(a)*r,2.5+Math.random()*.7,Math.sin(a)*r);
+    g.add(b);
+  }
+  g.userData={type:'berryTree',health:90};return g;
+}
+function makeBush(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.SphereGeometry(0.75,8,6),new THREE.MeshLambertMaterial({color:0x3a9e1a}));
+  b.position.y=0.75;b.castShadow=true;g.add(b);
+  g.userData={type:'bush',health:50};return g;
+}
+function makeSapling(){
+  const g=new THREE.Group();
+  const s=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.1,0.6,6),new THREE.MeshLambertMaterial({color:0x6a8a2a}));
+  s.position.y=0.3;g.add(s);
+  const l=new THREE.Mesh(new THREE.SphereGeometry(0.3,6,5),new THREE.MeshLambertMaterial({color:0x5adc2a}));
+  l.position.y=0.85;g.add(l);
+  g.userData={type:'sapling',health:100,growth:0};return g;
+}
+function makeRock(){
+  const g=new THREE.Group();
+  for(let i=0;i<3;i++){
+    const r=0.3+Math.random()*0.4;
+    const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),new THREE.MeshLambertMaterial({color:0x888880}));
+    rock.position.set((Math.random()-.5)*.6,(Math.random()*.2),( Math.random()-.5)*.6);
+    rock.rotation.set(Math.random(),Math.random(),Math.random());
+    rock.castShadow=true;rock.receiveShadow=true;g.add(rock);
+  }
+  g.userData={type:'rock',health:150};return g;
+}
+function makeCampfire(){
+  const g=new THREE.Group();
+  // Logs
+  for(let i=0;i<3;i++){
+    const log=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,0.9,6),new THREE.MeshLambertMaterial({color:0x7a3a0a}));
+    log.rotation.z=Math.PI/2;
+    log.rotation.y=(i/3)*Math.PI*2;
+    log.position.set(Math.cos((i/3)*Math.PI*2)*0.25,0.08,Math.sin((i/3)*Math.PI*2)*0.25);
+    g.add(log);
+  }
+  // Fire light
+  const fl=new THREE.PointLight(0xff6600,2.5,8);fl.position.y=0.7;
+  g.add(fl);g.userData.fireLight=fl;
+  // Flame mesh
+  const flame=new THREE.Mesh(new THREE.ConeGeometry(0.25,0.6,8),new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:.85}));
+  flame.position.y=0.6;g.add(flame);g.userData.flame=flame;
+  g.userData={type:'campfire',health:999,fireLight:fl,flame};
+  return g;
+}
+function makeTorch(){
+  const g=new THREE.Group();
+  const stick=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,1.2,6),new THREE.MeshLambertMaterial({color:0x8a5a1a}));
+  stick.position.y=0.6;g.add(stick);
+  const head=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.08,0.25,6),new THREE.MeshLambertMaterial({color:0xaa4400}));
+  head.position.y=1.25;g.add(head);
+  const tl=new THREE.PointLight(0xff8800,1.8,7);tl.position.y=1.4;g.add(tl);
+  g.userData={type:'torch',health:999,light:tl};
+  return g;
+}
+function makeFish(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.25,6,5),new THREE.MeshLambertMaterial({color:0x20a0d0}));
+  body.scale.set(1.8,0.8,0.7);g.add(body);
+  g.userData={type:'fish',health:999};return g;
+}
+
+// =====================================================================
+// SPAWN WORLD
+// =====================================================================
+const entities=[];
+function spawnEntities(){
+  for(let i=0;i<250;i++){
+    const wx=Math.random()*WSIZE*TSIZE-HALF;
+    const wz=Math.random()*WSIZE*TSIZE-HALF;
+    if(getTileAt(wx,wz).type!=='grass')continue;
+    const r=Math.random();
+    let obj;
+    if(r<0.18)obj=makeBerryTree();
+    else if(r<0.62)obj=makeTree();
+    else if(r<0.82)obj=makeBush();
+    else obj=makeRock();
+    obj.position.set(wx,0,wz);
+    scene.add(obj);entities.push(obj);
+  }
+  // Decorative rocks on sand
+  for(let i=0;i<40;i++){
+    const wx=Math.random()*WSIZE*TSIZE-HALF;
+    const wz=Math.random()*WSIZE*TSIZE-HALF;
+    if(getTileAt(wx,wz).type!=='sand')continue;
+    const r=makeRock();r.position.set(wx,0,wz);scene.add(r);entities.push(r);
+  }
+}
+
+// =====================================================================
+// PLAYER SETUP
+// =====================================================================
+// Spiral outward from center until a grass tile is found — guaranteed to work
+let spawnX=0,spawnZ=0,spawnFound=false;
+const scx=Math.floor(WSIZE/2),scz=Math.floor(WSIZE/2);
+outer:for(let radius=0;radius<WSIZE/2;radius++){
+  for(let dz=-radius;dz<=radius;dz++){
+    for(let dx=-radius;dx<=radius;dx++){
+      if(Math.abs(dx)!==radius&&Math.abs(dz)!==radius)continue; // ring only
+      const tx=scx+dx,tz=scz+dz;
+      if(tx<0||tx>=WSIZE||tz<0||tz>=WSIZE)continue;
+      if(tiles[tz][tx].type==='grass'){
+        spawnX=tx*TSIZE-HALF+TSIZE/2;
+        spawnZ=tz*TSIZE-HALF+TSIZE/2;
+        spawnFound=true;break outer;
+      }
+    }
+  }
+}
+// Absolute fallback: force center tile to grass
+if(!spawnFound){
+  tiles[scz][scx].type='grass';
+  tiles[scz][scx].mesh.material=matGrass;
+  tiles[scz][scx].mesh.position.y=0;
+  spawnX=scx*TSIZE-HALF+TSIZE/2;
+  spawnZ=scz*TSIZE-HALF+TSIZE/2;
+}
+
+const playerGroup=new THREE.Group();
+// Body
+const bodyMesh=new THREE.Mesh(new THREE.BoxGeometry(0.52,0.72,0.32),new THREE.MeshLambertMaterial({color:0x0070cc}));
+bodyMesh.position.y=0.9;bodyMesh.castShadow=true;playerGroup.add(bodyMesh);
+// Head
+const headMesh=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.4),new THREE.MeshLambertMaterial({color:0xffcc99}));
+headMesh.position.y=1.5;headMesh.castShadow=true;playerGroup.add(headMesh);
+// Eyes
+const eyeG=new THREE.SphereGeometry(0.065,5,5),eyeM=new THREE.MeshBasicMaterial({color:0x222222});
+const le=new THREE.Mesh(eyeG,eyeM);le.position.set(-0.1,1.53,0.2);playerGroup.add(le);
+const re=new THREE.Mesh(eyeG,eyeM);re.position.set(0.1,1.53,0.2);playerGroup.add(re);
+// Arms
+const armG=new THREE.BoxGeometry(0.18,0.6,0.18),armM=new THREE.MeshLambertMaterial({color:0x0060bb});
+const lArm=new THREE.Mesh(armG,armM);lArm.position.set(-0.37,0.9,0);playerGroup.add(lArm);
+const rArm=new THREE.Mesh(armG,armM);rArm.position.set(0.37,0.9,0);playerGroup.add(rArm);
+// Legs
+const legG=new THREE.BoxGeometry(0.2,0.55,0.22),legM=new THREE.MeshLambertMaterial({color:0x334499});
+const ll=new THREE.Mesh(legG,legM);ll.position.set(-0.14,0.27,0);playerGroup.add(ll);
+const rl=new THREE.Mesh(legG,legM);rl.position.set(0.14,0.27,0);playerGroup.add(rl);
+
+playerGroup.position.set(spawnX,0,spawnZ);
+scene.add(playerGroup);
+
+const player={
+  x:spawnX,z:spawnZ,
+  speed:5,sprintSpeed:9,
+  health:100,hunger:100,thirst:100,stamina:100,
+  yaw:0,dead:false,
+  woodCollected:0,berriesEaten:0,saplingsPlanted:0,landExpanded:false,campfireBuilt:false
+};
+
+// =====================================================================
+// INVENTORY
+// =====================================================================
+let inventory=[
+  {id:'berry',name:'Berries',emoji:'🫐',count:15},
+  {id:'wood',name:'Wood',emoji:'🪵',count:30},
+  {id:'sapling',name:'Sapling',emoji:'🌱',count:6}
+];
+let hotbarIdx=0;
+
+function addItem(id,name,emoji,count=1){
+  let it=inventory.find(i=>i.id===id);
+  if(it)it.count+=count;else inventory.push({id,name,emoji,count});
+  renderHotbar();
+  // Quest tracking
+  if(id==='wood'){player.woodCollected+=count;checkQuests();}
+  if(id==='fish')addScore(30);
+}
+
+function removeItem(id,count=1){
+  const it=inventory.find(i=>i.id===id);
+  if(!it||it.count<count)return false;
+  it.count-=count;
+  if(it.count<=0)inventory.splice(inventory.indexOf(it),1);
+  renderHotbar();return true;
+}
+
+function getItemCount(id){
+  const it=inventory.find(i=>i.id===id);return it?it.count:0;
+}
+
+function renderHotbar(){
+  const h=document.getElementById('hotbar');h.innerHTML='';
+  for(let i=0;i<8;i++){
+    const s=document.createElement('div');
+    s.className='slot'+(i===hotbarIdx?' sel':'');
+    if(inventory[i]){
+      const it=inventory[i];
+      s.innerHTML=`<span class="sname">${it.name.substring(0,5)}</span>${it.emoji}<span class="sc">${it.count}</span>`;
+    }
+    s.onclick=ev=>{ev.stopPropagation();hotbarIdx=i;renderHotbar()};
+    h.appendChild(s);
+  }
+}
+
+// =====================================================================
+// USE ITEM
+// =====================================================================
+function useItem(){
+  const it=inventory[hotbarIdx];
+  if(!it||it.count<=0)return;
+  if(it.id==='berry'){
+    player.hunger=Math.min(100,player.hunger+28);
+    player.thirst=Math.min(100,player.thirst+15);
+    player.berriesEaten++;checkQuests();
+    addScore(5);showMsg('🫐 Ate Berries (+hunger +thirst)');
+  }else if(it.id==='medicine'){
+    player.health=Math.min(100,player.health+35);
+    addScore(10);showMsg('💊 Used Medicine (+35 health)');
+  }else if(it.id==='fish'){
+    player.hunger=Math.min(100,player.hunger+45);
+    player.health=Math.min(100,player.health+10);
+    addScore(15);showMsg('🐟 Ate Fish (+hunger +health)');
+  }else if(it.id==='sapling'){plantSapling();return;}
+  else if(it.id==='campfire_item'){placeCampfire();return;}
+  else if(it.id==='torch'){placeTorch();return;}
+  else if(it.id==='raft'){
+    addScore(500);showMsg('🛶 You built a raft and escaped! +500 pts',4000);
+    flashScreen('#00ff88');return;
+  }else{showMsg('❌ Cannot use this right now');return;}
+  removeItem(it.id);
+}
+
+function plantSapling(){
+  const it=inventory[hotbarIdx];
+  if(!it||it.count<=0)return;
+  const ox=(Math.random()-.5)*5,oz=(Math.random()-.5)*5;
+  const px=player.x+ox,pz=player.z+oz;
+  if(getTileAt(px,pz).type==='grass'){
+    const s=makeSapling();s.position.set(px,0,pz);
+    scene.add(s);entities.push(s);
+    removeItem('sapling');
+    player.saplingsPlanted++;checkQuests();
+    addScore(10);showMsg('🌱 Sapling Planted');
+  }else showMsg('❌ Plant only on grass!');
+}
+
+function drinkWater(){
+  if(player.thirst>=98){showMsg('Not thirsty');return;}
+  if(isNearWater()){
+    player.thirst=Math.min(100,player.thirst+55);
+    addScore(2);showMsg('💧 Drank Water');
+  }else showMsg('❌ Get closer to water!');
+}
+
+function isNearWater(){
+  for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++)
+    if(getTileAt(player.x+dx*TSIZE,player.z+dz*TSIZE).type==='water')return true;
+  return false;
+}
+
+function expandLand(){
+  if(getItemCount('wood')<20){showMsg('❌ Need 20 Wood!');return;}
+  let expanded=false;
+  const r=5;
+  const cx=Math.floor((player.x+HALF)/TSIZE);
+  const cz=Math.floor((player.z+HALF)/TSIZE);
+  for(let tz=cz-r;tz<=cz+r;tz++)for(let tx=cx-r;tx<=cx+r;tx++){
+    if(tx<0||tx>=WSIZE||tz<0||tz>=WSIZE)continue;
+    if(tiles[tz][tx].type==='water'){
+      const isGrass=Math.random()>.4;
+      tiles[tz][tx].type=isGrass?'grass':'sand';
+      tiles[tz][tx].mesh.material=isGrass?matGrass:matSand;
+      tiles[tz][tx].mesh.position.y=0;expanded=true;
+    }
+  }
+  if(expanded){
+    removeItem('wood',20);
+    player.landExpanded=true;checkQuests();
+    addScore(50);flashScreen('#00aaff');
+    showMsg('🌍 Land Expanded! +50 pts');
+  }
+}
+
+// =====================================================================
+// CRAFTING
+// =====================================================================
+let craftOpen=false;
+function openCraft(){
+  craftOpen=true;
+  document.getElementById('craft-panel').style.display='block';
+  if(document.pointerLockElement===canvas)document.exitPointerLock();
+}
+function closeCraft(){
+  craftOpen=false;
+  document.getElementById('craft-panel').style.display='none';
+}
+function craftCampfire(){
+  if(!removeItem('wood',5)){showMsg('❌ Need 5 Wood!');return;}
+  addItem('campfire_item','Campfire','🔥');
+  addScore(20);notify('🔥 Campfire crafted!');
+  player.campfireBuilt=true;checkQuests();closeCraft();
+}
+function craftRaft(){
+  if(!removeItem('wood',8)){showMsg('❌ Need 8 Wood!');return;}
+  addItem('raft','Raft','🛶');
+  addScore(40);notify('🛶 Raft crafted! Use it to escape!');closeCraft();
+}
+function craftMedicine(){
+  if(!removeItem('berry',4)){showMsg('❌ Need 4 Berries!');return;}
+  addItem('medicine','Medicine','💊');
+  addScore(15);notify('💊 Medicine crafted!');closeCraft();
+}
+function craftFishingRod(){
+  if(!removeItem('wood',3)){showMsg('❌ Need 3 Wood!');return;}
+  addItem('fishingrod','Fishing Rod','🎣');
+  addScore(15);notify('🎣 Fishing rod crafted!');closeCraft();
+}
+
+function placeCampfire(){
+  if(!removeItem('campfire_item')){return;}
+  const cf=makeCampfire();
+  cf.position.set(player.x+(Math.random()-.5)*3,0,player.z+(Math.random()-.5)*3);
+  scene.add(cf);entities.push(cf);
+  showMsg('🔥 Campfire placed! It warms you.');
+}
+
+function placeTorch(){
+  if(!removeItem('torch')){return;}
+  const t=makeTorch();
+  t.position.set(player.x+(Math.random()-.5)*2,0,player.z+(Math.random()-.5)*2);
+  scene.add(t);entities.push(t);
+  showMsg('🔦 Torch placed!');
+}
+
+// =====================================================================
+// FISHING
+// =====================================================================
+let fishingTimer=0,isFishing=false;
+function startFishing(){
+  if(getItemCount('fishingrod')<1){showMsg('❌ Need a Fishing Rod! (Craft C)');return;}
+  if(!isNearWater()){showMsg('❌ Stand near water to fish!');return;}
+  if(isFishing)return;
+  isFishing=true;fishingTimer=0;
+  notify('🎣 Fishing... wait 4 seconds!');
+}
+
+// =====================================================================
+// HARVEST (Raycaster)
+// =====================================================================
+const raycaster=new THREE.Raycaster();
+function harvest(){
+  if(!pointerLocked)return;
+  raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+  const meshes=[];
+  for(const e of entities)e.traverse(c=>{if(c.isMesh)meshes.push(c)});
+  const hits=raycaster.intersectObjects(meshes);
+  if(!hits.length)return;
+  let target=hits[0].object;
+  while(target.parent&&!target.userData.type)target=target.parent;
+  if(!target.userData.type||target.userData.type==='campfire'||target.userData.type==='torch')return;
+
+  const dist=target.position.distanceTo(playerGroup.position);
+  if(dist>10){showMsg('❌ Too far away!');return;}
+
+  // Shake
+  const origX=target.position.x;
+  target.position.x+=0.1;
+  setTimeout(()=>{if(target.parent)target.position.x=origX;},90);
+
+  target.userData.health-=55;
+  flashScreen('rgba(255,150,0,0.15)');
+
+  if(target.userData.health<=0){
+    if(target.userData.type==='tree'){
+      addItem('wood','Wood','🪵',7);addItem('sapling','Sapling','🌱',1);
+      notify('🪵 Got 7 Wood + 1 Sapling');addScore(15);
+    }else if(target.userData.type==='berryTree'){
+      addItem('berry','Berries','🫐',9);addItem('sapling','Sapling','🌱',1);
+      notify('🫐 Got 9 Berries + 1 Sapling');addScore(10);
+    }else if(target.userData.type==='bush'){
+      addItem('berry','Berries','🫐',6);
+      notify('🫐 Got 6 Berries');addScore(8);
+    }else if(target.userData.type==='rock'){
+      addItem('stone','Stone','🪨',3);
+      notify('🪨 Got 3 Stone');addScore(5);
+    }
+    scene.remove(target);
+    const idx=entities.indexOf(target);if(idx>-1)entities.splice(idx,1);
+  }
+}
+canvas.addEventListener('click',harvest);
+
+// =====================================================================
+// SCORE
+// =====================================================================
+let score=0;
+function addScore(n){
+  score+=n;
+  document.getElementById('sc').textContent=score;
+}
+
+// =====================================================================
+// QUESTS
+// =====================================================================
+const questsDone={q1:false,q2:false,q3:false,q4:false,q5:false,q6:false};
+function checkQuests(){
+  if(!questsDone.q1&&player.woodCollected>=10){questsDone.q1=true;completeQuest('q1','Collected 10 Wood',30);}
+  if(!questsDone.q2&&player.berriesEaten>=3){questsDone.q2=true;completeQuest('q2','Ate 3 Berries',20);}
+  if(!questsDone.q3&&day>=3){questsDone.q3=true;completeQuest('q3','Survived 3 Days',50);}
+  if(!questsDone.q4&&player.saplingsPlanted>=3){questsDone.q4=true;completeQuest('q4','Planted 3 Saplings',25);}
+  if(!questsDone.q5&&player.landExpanded){questsDone.q5=true;completeQuest('q5','Expanded Land',40);}
+  if(!questsDone.q6&&player.campfireBuilt){questsDone.q6=true;completeQuest('q6','Built a Campfire',35);}
+}
+function completeQuest(id,label,pts){
+  const el=document.getElementById(id);
+  if(el){el.className='quest done';el.innerHTML=`<span class="qcheck">✓</span>${label}`;}
+  addScore(pts);notify(`✅ Quest Done: ${label} +${pts} pts`);flashScreen('#ffff00');
+}
+
+// =====================================================================
+// WEATHER
+// =====================================================================
+const weathers=['☀️ Clear','🌧️ Rain','⛈️ Storm','🌫️ Fog','🌙 Night'];
+let weatherIdx=0;let rainParticles=null;
+const weatherEffects={
+  '☀️ Clear':{skyColor:0x6ab0e0,fogDensity:180,sunInt:1.5,score:0},
+  '🌧️ Rain':{skyColor:0x3a5570,fogDensity:80,sunInt:0.4,score:0},
+  '⛈️ Storm':{skyColor:0x252530,fogDensity:50,sunInt:0.15,score:0},
+  '🌫️ Fog':{skyColor:0x9aabb0,fogDensity:35,sunInt:0.6,score:0},
+  '🌙 Night':{skyColor:0x0a0a20,fogDensity:140,sunInt:0.0,score:0}
+};
+function cycleWeather(){
+  weatherIdx=(weatherIdx+1)%weathers.length;
+  applyWeather();
+}
+function applyWeather(){
+  const wname=weathers[weatherIdx];
+  const we=weatherEffects[wname];
+  document.getElementById('weathericon').textContent=wname.split(' ')[0];
+  scene.fog.far=we.fogDensity;
+  scene.background=new THREE.Color(we.skyColor);
+  scene.fog.color=new THREE.Color(we.skyColor);
+  sun.intensity=we.sunInt;
+  if(wname.includes('Night'))moonLight.intensity=0.5;else moonLight.intensity=0;
+  if(wname.includes('Rain')||wname.includes('Storm')){
+    if(!rainParticles)spawnRain();
+    player.thirst=Math.min(100,player.thirst+15);
+    showMsg('🌧️ Rain collected! +thirst',1200);
+  }else{removeRain();}
+  if(wname.includes('Storm')){
+    player.health=Math.max(0,player.health-5);
+    flashScreen('#ffffff');showMsg('⛈️ Storm hit! -5 health',1500);
+  }
+  notify('Weather: '+wname);
+}
+
+const rainGeo=new THREE.BufferGeometry();
+const rainVerts=[];
+for(let i=0;i<3000;i++){rainVerts.push((Math.random()-.5)*120,(Math.random()*30),(Math.random()-.5)*120);}
+rainGeo.setAttribute('position',new THREE.Float32BufferAttribute(rainVerts,3));
+const rainMat=new THREE.PointsMaterial({color:0x88bbff,size:0.08,transparent:true,opacity:0.6});
+let rainPS=null;
+function spawnRain(){if(!rainPS){rainPS=new THREE.Points(rainGeo,rainMat);scene.add(rainPS);}}
+function removeRain(){if(rainPS){scene.remove(rainPS);rainPS=null;}}
+
+// =====================================================================
+// MINIMAP
+// =====================================================================
+const mmCanvas=document.getElementById('mm');
+const mmCtx=mmCanvas.getContext('2d');
+function drawMinimap(){
+  const sz=130,scale=sz/WSIZE;
+  mmCtx.clearRect(0,0,sz,sz);
+  for(let z=0;z<WSIZE;z++)for(let x=0;x<WSIZE;x++){
+    const t=tiles[z][x].type;
+    mmCtx.fillStyle=t==='water'?'#1a4a8a':t==='sand'?'#c8a84a':'#2a6a1a';
+    mmCtx.fillRect(x*scale,z*scale,scale+0.5,scale+0.5);
+  }
+  // Entities dots
+  for(const e of entities){
+    const ex=(e.position.x+HALF)/TSIZE*scale;
+    const ez=(e.position.z+HALF)/TSIZE*scale;
+    if(e.userData.type==='campfire')mmCtx.fillStyle='#ff6600';
+    else if(e.userData.type==='berryTree')mmCtx.fillStyle='#cc2244';
+    else if(e.userData.type==='tree')mmCtx.fillStyle='#1e7a1e';
+    else continue;
+    mmCtx.fillRect(ex-1,ez-1,2.5,2.5);
+  }
+  // Player
+  const px=(player.x+HALF)/TSIZE*scale;
+  const pz=(player.z+HALF)/TSIZE*scale;
+  mmCtx.fillStyle='#00ffff';
+  mmCtx.beginPath();mmCtx.arc(px,pz,2.5,0,Math.PI*2);mmCtx.fill();
+  // Direction arrow
+  mmCtx.strokeStyle='#00ffff';mmCtx.lineWidth=1.2;
+  mmCtx.beginPath();
+  mmCtx.moveTo(px,pz);
+  mmCtx.lineTo(px-Math.sin(player.yaw)*6,pz-Math.cos(player.yaw)*6);
+  mmCtx.stroke();
+}
+
+// =====================================================================
+// NOTIFICATIONS
+// =====================================================================
+function notify(text,ms=2500){
+  const c=document.getElementById('notifs');
+  const d=document.createElement('div');
+  d.className='notif';d.textContent=text;
+  c.appendChild(d);
+  setTimeout(()=>{d.style.opacity=0;d.style.transition='opacity .3s';setTimeout(()=>d.remove(),350);},ms);
+}
+
+let msgTimer=null;
+function showMsg(t,ms=1600){
+  const m=document.getElementById('msg');
+  m.textContent=t;m.style.opacity=1;
+  clearTimeout(msgTimer);
+  msgTimer=setTimeout(()=>m.style.opacity=0,ms);
+}
+
+function flashScreen(col){
+  const f=document.getElementById('flash');
+  f.style.background=col;f.style.opacity=0.5;
+  setTimeout(()=>f.style.opacity=0,180);
+}
+
+// =====================================================================
+// POINTER LOCK & CONTROLS
+// =====================================================================
+let pointerLocked=false;
+let camDist=6.5,camPitch=0.42;
+canvas.addEventListener('click',()=>{
+  if(!pointerLocked&&!craftOpen)canvas.requestPointerLock&&canvas.requestPointerLock();
+});
+document.addEventListener('pointerlockchange',()=>{
+  pointerLocked=document.pointerLockElement===canvas;
+  document.getElementById('hintbar').textContent=
+    pointerLocked?'ESC=release mouse | H=hide controls':'Click to capture mouse';
+});
+document.addEventListener('mousemove',e=>{
+  if(!pointerLocked)return;
+  player.yaw-=e.movementX*0.0025;
+  camPitch=Math.max(0.12,Math.min(1.25,camPitch+e.movementY*0.003));
+});
+document.addEventListener('wheel',e=>{
+  if(!craftOpen){
+    hotbarIdx=(hotbarIdx+(e.deltaY>0?1:-1)+8)%8;renderHotbar();
+  }
+  camDist=Math.max(3,Math.min(15,camDist+e.deltaY*0.005));
+});
+
+const keys={};
+let keysHidden=false;
+document.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  if(e.key==='e'||e.key==='E')useItem();
+  if(e.key==='f'||e.key==='F')drinkWater();
+  if(e.key==='v'||e.key==='V')expandLand();
+  if(e.key==='c'||e.key==='C'){craftOpen?closeCraft():openCraft();}
+  if(e.key==='r'||e.key==='R'){
+    if(getItemCount('torch')>0)placeTorch();
+    else if(getItemCount('wood')>=3){removeItem('wood',3);addItem('torch','Torch','🔦');placeTorch();}
+    else showMsg('❌ Need 3 wood for a torch');
+  }
+  if(e.key==='t'||e.key==='T')cycleWeather();
+  if(e.key==='g'||e.key==='G')startFishing();
+  if(e.key==='h'||e.key==='H'){keysHidden=!keysHidden;document.getElementById('keys').className=keysHidden?'hidden':'';}
+  if(e.key>='1'&&e.key<='8'){hotbarIdx=parseInt(e.key)-1;renderHotbar();}
+  if(e.key==='Escape'&&pointerLocked)document.exitPointerLock&&document.exitPointerLock();
+});
+document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+// =====================================================================
+// GAME STATE
+// =====================================================================
+let day=1,gameTime=0,lastT=performance.now(),totalTime=0;
+let autoWeatherTimer=0;
+let legBob=0;
+
+// =====================================================================
+// RESTART
+// =====================================================================
+function restartGame(){
+  location.reload();
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+spawnEntities();
+renderHotbar();
+applyWeather();
+scene.background=new THREE.Color(0x6ab0e0);
+scene.fog=new THREE.Fog(0x6ab0e0,55,180);
+showMsg('🌴 Click canvas to start! C=Craft | T=Weather | G=Fish',5000);
+
+// =====================================================================
+// MAIN LOOP
+// =====================================================================
+function gameLoop(now){
+  requestAnimationFrame(gameLoop);
+  if(player.dead)return;
+  const dt=Math.min((now-lastT)/1000,0.1);lastT=now;
+  gameTime+=dt*1000;totalTime+=dt;
+
+  // Day counter
+  if(gameTime>=120000){
+    gameTime=0;day++;
+    document.getElementById('dc').textContent=day;
+    notify('🌅 Day '+day+' begins');addScore(20);
+    checkQuests();
+    // Random weather change
+    if(Math.random()<0.4)cycleWeather();
+  }
+
+  // Day/night lighting
+  const phase=gameTime/120000;
+  const dayBright=0.5+0.5*Math.sin(phase*Math.PI);
+  sun.intensity=Math.max(0,dayBright*1.6-(weathers[weatherIdx].includes('Night')?10:0));
+  ambLight.intensity=0.3+0.5*dayBright;
+  const sky=new THREE.Color().setHSL(0.58,0.55,0.25+0.35*dayBright);
+  if(!weathers[weatherIdx].includes('Night')&&!weathers[weatherIdx].includes('Rain')&&!weathers[weatherIdx].includes('Storm')){
+    scene.background=sky;scene.fog.color=sky;
+  }
+
+  // Rain animation
+  if(rainPS){
+    const pos=rainPS.geometry.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      pos.setY(i,pos.getY(i)-0.35);
+      if(pos.getY(i)<-1){pos.setY(i,30);}
+    }
+    pos.needsUpdate=true;
+    rainPS.position.x=player.x;rainPS.position.z=player.z;
+  }
+
+  // Campfire flicker
+  for(const e of entities){
+    if(e.userData.type==='campfire'&&e.userData.fireLight){
+      e.userData.fireLight.intensity=2+Math.sin(now*0.008)*0.8+Math.random()*0.4;
+      if(e.userData.flame){
+        e.userData.flame.scale.y=0.9+Math.sin(now*0.012)*0.2;
+        e.userData.flame.rotation.y+=0.06;
+      }
+      // Warmth near campfire
+      if(e.position.distanceTo(playerGroup.position)<4){
+        player.health=Math.min(100,player.health+0.02*dt*60);
+      }
+    }
+  }
+
+  // Sapling growth
+  for(const e of entities){
+    if(e.userData.type==='sapling'){
+      e.userData.growth+=dt*0.4;
+      const s=1+e.userData.growth*0.015;
+      e.scale.set(Math.min(s,2.5),Math.min(s,2.5),Math.min(s,2.5));
+      if(e.userData.growth>=100){
+        e.userData.type='tree';e.userData.health=100;
+        notify('🌳 Sapling grew into a Tree!');addScore(15);
+      }
+    }
+  }
+
+  // Fishing
+  if(isFishing){
+    fishingTimer+=dt;
+    if(fishingTimer>=4){
+      isFishing=false;
+      if(isNearWater()&&Math.random()<0.75){
+        addItem('fish','Fish','🐟',1+Math.floor(Math.random()*2));
+        notify('🐟 Caught a fish!');addScore(30);
+      }else{notify('❌ No fish this time...');}
+    }
+  }
+
+  // Movement
+  const sprinting=keys['shift']&&player.stamina>0;
+  const spd=sprinting?player.sprintSpeed:player.speed;
+  if(sprinting)player.stamina=Math.max(0,player.stamina-30*dt);
+  else player.stamina=Math.min(100,player.stamina+15*dt);
+
+  let dx=0,dz=0;
+  const fwd=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
+  const right=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
+  if(keys['w']||keys['arrowup']){dx+=fwd.x;dz+=fwd.z;}
+  if(keys['s']||keys['arrowdown']){dx-=fwd.x;dz-=fwd.z;}
+  if(keys['a']||keys['arrowleft']){dx-=right.x;dz-=right.z;}
+  if(keys['d']||keys['arrowright']){dx+=right.x;dz+=right.z;}
+
+  const moving=dx||dz;
+  if(moving){
+    const len=Math.hypot(dx,dz);dx/=len;dz/=len;
+    const nx=player.x+dx*spd*dt;
+    const nz=player.z+dz*spd*dt;
+    if(getTileAt(nx,player.z).type!=='water')player.x=nx;
+    if(getTileAt(player.x,nz).type!=='water')player.z=nz;
+    // Walking animation
+    legBob+=dt*10;
+    ll.position.y=0.27+0.12*Math.sin(legBob);
+    rl.position.y=0.27-0.12*Math.sin(legBob);
+    lArm.rotation.x=0.3*Math.sin(legBob);
+    rArm.rotation.x=-0.3*Math.sin(legBob);
+    if(sprinting)addScore(Math.random()<0.02?1:0);
+  }
+
+  playerGroup.position.set(player.x,0,player.z);
+  playerGroup.rotation.y=player.yaw;
+
+  // Survival drain
+  const stormMult=weathers[weatherIdx].includes('Storm')?2:1;
+  player.hunger=Math.max(0,player.hunger-0.7*dt*stormMult);
+  player.thirst=Math.max(0,player.thirst-1.4*dt*stormMult);
+  if(player.hunger<=0)player.health=Math.max(0,player.health-1.0*dt);
+  if(player.thirst<=0)player.health=Math.max(0,player.health-1.5*dt);
+  if(player.hunger<20&&Math.random()<dt*0.3)notify('🍖 Hungry! Eat something!');
+  if(player.thirst<20&&Math.random()<dt*0.3)notify('💧 Thirsty! Drink water!');
+
+  // Score for surviving
+  if(Math.random()<dt*0.05)addScore(1);
+
+  // Update HUD
+  document.getElementById('hb').style.width=player.health+'%';
+  document.getElementById('fb').style.width=Math.max(0,player.hunger)+'%';
+  document.getElementById('wb').style.width=Math.max(0,player.thirst)+'%';
+  document.getElementById('stb').style.width=Math.max(0,player.stamina)+'%';
+
+  // Low health warning
+  if(player.health<25){
+    document.getElementById('hb').style.background='linear-gradient(90deg,#800,#f00)';
+    if(Math.random()<dt*0.5)flashScreen('rgba(200,0,0,0.1)');
+  }
+
+  // Death
+  if(player.health<=0){
+    player.dead=true;
+    document.getElementById('deathscreen').style.display='flex';
+    document.getElementById('death-stats').textContent=
+      `Survived ${day} days · Score: ${score} · Time: ${Math.floor(totalTime/60)}m ${Math.floor(totalTime%60)}s`;
+    if(document.pointerLockElement)document.exitPointerLock();return;
+  }
+
+  // Camera
+  const camX=player.x+Math.sin(player.yaw)*camDist*Math.cos(camPitch);
+  const camY=camDist*Math.sin(camPitch)+1.6;
+  const camZ=player.z+Math.cos(player.yaw)*camDist*Math.cos(camPitch);
+  camera.position.lerp(new THREE.Vector3(camX,camY,camZ),0.1);
+  camera.lookAt(player.x,1.3,player.z);
+
+  // Minimap every 6 frames
+  if(Math.floor(totalTime*60)%6===0)drawMinimap();
+
+  renderer.render(scene,camera);
+}
+
+W.addEventListener('resize',()=>{
+  renderer.setSize(W.innerWidth,W.innerHeight);
+  camera.aspect=W.innerWidth/W.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+requestAnimationFrame(gameLoop);
+</script>
 </body>
 </html>
